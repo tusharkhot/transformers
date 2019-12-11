@@ -221,7 +221,7 @@ class ArcProcessor(DataProcessor):
 
     def get_labels(self):
         """See base class."""
-        return ["0", "1", "2", "3"]
+        return [str(i) for i in range(self.num_choices)]
 
     def _read_json(self, input_file):
         with open(input_file, "r", encoding="utf-8") as fin:

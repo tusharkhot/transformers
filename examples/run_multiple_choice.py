@@ -324,7 +324,7 @@ def load_and_cache_examples(args, task, tokenizer, evaluate=False, test=False):
     if args.local_rank not in [-1, 0]:
         torch.distributed.barrier()  # Make sure only the first process in distributed training process the dataset, and the others will use the cache
 
-    processor = processors[task]()
+    processor = processors[task](args.num_choices)
     # Load data features from cache or dataset file
     if evaluate:
         cached_mode = "dev"
@@ -421,6 +421,9 @@ def main():
     )
 
     # Other parameters
+    parser.add_argument('--num_choices',  default=4, type=int,
+                        help="Number of answer choices (will ignore questions with mismatch)")
+
     parser.add_argument(
         "--config_name", default="", type=str, help="Pretrained config name or path if not the same as model_name"
     )
@@ -565,7 +568,7 @@ def main():
     args.task_name = args.task_name.lower()
     if args.task_name not in processors:
         raise ValueError("Task not found: %s" % (args.task_name))
-    processor = processors[args.task_name]()
+    processor = processors[args.task_name](args.num_choices)
     label_list = processor.get_labels()
     num_labels = len(label_list)
 

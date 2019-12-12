@@ -21,6 +21,7 @@ import glob
 import logging
 import os
 import random
+from math import ceil
 
 import numpy as np
 import torch
@@ -105,9 +106,12 @@ def train(args, train_dataset, model, tokenizer):
         {"params": [p for n, p in model.named_parameters() if any(nd in n for nd in no_decay)], "weight_decay": 0.0},
     ]
     optimizer = AdamW(optimizer_grouped_parameters, lr=args.learning_rate, eps=args.adam_epsilon)
+    if 1 > args.warmup_steps > 0:
+        warmup_steps = ceil(t_total * args.warmup_steps)
+    else:
+        warmup_steps = args.warmup_steps
     scheduler = get_linear_schedule_with_warmup(
-        optimizer, num_warmup_steps=args.warmup_steps, num_training_steps=t_total
-    )
+        optimizer, num_warmup_steps=warmup_steps, num_training_steps=t_total)
     if args.fp16:
         try:
             from apex import amp
@@ -182,7 +186,7 @@ def train(args, train_dataset, model, tokenizer):
                 scheduler.step()  # Update learning rate schedule
                 model.zero_grad()
                 global_step += 1
-
+                tb_writer.add_scalar('lr', scheduler.get_lr()[0], global_step)
                 if args.local_rank in [-1, 0] and args.logging_steps > 0 and global_step % args.logging_steps == 0:
                     # Log metrics
                     if (
@@ -204,7 +208,7 @@ def train(args, train_dataset, model, tokenizer):
                                     str(results_test["eval_loss"]),
                                     str(global_step),
                                 )
-                    tb_writer.add_scalar("lr", scheduler.get_lr()[0], global_step)
+                    # tb_writer.add_scalar("lr", scheduler.get_lr()[0], global_step)
                     tb_writer.add_scalar("loss", (tr_loss - logging_loss) / args.logging_steps, global_step)
                     logger.info(
                         "Average loss: %s at global step: %s",
@@ -479,7 +483,7 @@ def main():
         type=int,
         help="If > 0: set total number of training steps to perform. Override num_train_epochs.",
     )
-    parser.add_argument("--warmup_steps", default=0, type=int, help="Linear warmup over warmup_steps.")
+    parser.add_argument("--warmup_steps", default=0, type=float, help="Linear warmup over warmup_steps.")
 
     parser.add_argument("--logging_steps", type=int, default=50, help="Log every X updates steps.")
     parser.add_argument("--save_steps", type=int, default=50, help="Save checkpoint every X updates steps.")

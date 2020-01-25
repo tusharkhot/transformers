@@ -116,7 +116,7 @@ class RaceProcessor(DataProcessor):
 
     def get_labels(self):
         """See base class."""
-        return [str(i) for i in range(self.num_choices)]
+        return ["0", "1", "2", "3"]
 
     def _read_txt(self, input_dir):
         lines = []

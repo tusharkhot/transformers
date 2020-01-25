@@ -385,8 +385,7 @@ class RobertaForMultipleChoice(BertPreTrainedModel):
         super().__init__(config)
 
         self.roberta = RobertaModel(config)
-        self.dropout = nn.Dropout(config.hidden_dropout_prob)
-        self.classifier = nn.Linear(config.hidden_size, 1)
+        self.classifier = RobertaClassificationHead(config, num_labels=1)
 
         self.init_weights()
 
@@ -454,10 +453,7 @@ class RobertaForMultipleChoice(BertPreTrainedModel):
             attention_mask=flat_attention_mask,
             head_mask=head_mask,
         )
-        pooled_output = outputs[1]
-
-        pooled_output = self.dropout(pooled_output)
-        logits = self.classifier(pooled_output)
+        logits = self.classifier(outputs[0])
         reshaped_logits = logits.view(-1, num_choices)
 
         outputs = (reshaped_logits,) + outputs[2:]  # add hidden states and attention if they are here
@@ -571,11 +567,14 @@ class RobertaForTokenClassification(BertPreTrainedModel):
 class RobertaClassificationHead(nn.Module):
     """Head for sentence-level classification tasks."""
 
-    def __init__(self, config):
+    def __init__(self, config, num_labels=None):
         super().__init__()
         self.dense = nn.Linear(config.hidden_size, config.hidden_size)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
-        self.out_proj = nn.Linear(config.hidden_size, config.num_labels)
+        if num_labels is None:
+            self.out_proj = nn.Linear(config.hidden_size, config.num_labels)
+        else:
+            self.out_proj = nn.Linear(config.hidden_size, num_labels)
 
     def forward(self, features, **kwargs):
         x = features[:, 0, :]  # take <s> token (equiv. to [CLS])

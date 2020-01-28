@@ -204,6 +204,7 @@ if is_torch_available():
         RobertaModel,
         RobertaForSequenceClassification,
         RobertaForMultipleChoice,
+        RobertaForMultipleChoiceMLP,
         RobertaForTokenClassification,
         RobertaForQuestionAnswering,
         ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP,

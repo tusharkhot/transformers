@@ -37,6 +37,7 @@ from transformers import (
     BertTokenizer,
     RobertaConfig,
     RobertaForMultipleChoice,
+    RobertaForMultipleChoiceMLP,
     RobertaTokenizer,
     XLNetConfig,
     XLNetForMultipleChoice,
@@ -62,6 +63,7 @@ MODEL_CLASSES = {
     "bert": (BertConfig, BertForMultipleChoice, BertTokenizer),
     "xlnet": (XLNetConfig, XLNetForMultipleChoice, XLNetTokenizer),
     "roberta": (RobertaConfig, RobertaForMultipleChoice, RobertaTokenizer),
+    "roberta_mlp": (RobertaConfig, RobertaForMultipleChoiceMLP, RobertaTokenizer)
 }
 
 

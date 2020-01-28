@@ -9,9 +9,8 @@ filelock==3.0.12
 idna==2.8
 jmespath==0.9.4
 joblib==0.14.1
-mkl-fft==1.0.15
-mkl-random==1.1.0
-mkl-service==2.3.0
+mkl-fft
+mkl-random
 numpy==1.17.4
 olefile==0.46
 Pillow==6.2.1

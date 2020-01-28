@@ -1,5 +1,5 @@
 # TODO: modify scripts to work with name change from default `Dockerfile`
-FROM python:3.6.8-stretch
+FROM python:3.6.10-stretch
 
 ENV LC_ALL=C.UTF-8
 ENV LANG=C.UTF-8
@@ -15,6 +15,8 @@ ENV NVIDIA_VISIBLE_DEVICES all
 ENV NVIDIA_DRIVER_CAPABILITIES compute,utility
 LABEL com.nvidia.volumes.needed="nvidia_driver"
 
+WORKDIR /stage/
+
 # Install base packages.
 RUN apt-get update --fix-missing && apt-get install -y \
     bzip2 \
@@ -29,10 +31,7 @@ RUN apt-get update --fix-missing && apt-get install -y \
     libxrender1 \
     wget \
     libevent-dev \
-    build-essential \
-    glpk-utils \
-    libglpk-dev \
-    openjdk-8-jdk && \
+    build-essential && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy select files needed for installing requirements.

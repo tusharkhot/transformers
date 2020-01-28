@@ -18,6 +18,7 @@
 
 import argparse
 import glob
+import json
 import logging
 import os
 import random
@@ -147,6 +148,7 @@ def train(args, train_dataset, model, tokenizer):
 
     global_step = 0
     tr_loss, logging_loss = 0.0, 0.0
+    output_metrics = {}
     best_dev_acc = 0.0
     best_steps = 0
     model.zero_grad()
@@ -197,6 +199,7 @@ def train(args, train_dataset, model, tokenizer):
                         results = evaluate(args, model, tokenizer)
                         for key, value in results.items():
                             tb_writer.add_scalar("eval_{}".format(key), value, global_step)
+                            output_metrics[f"{global_step}.{key}"] = value
                         if results["eval_acc"] > best_dev_acc:
                             best_dev_acc = results["eval_acc"]
                             best_steps = global_step
@@ -241,7 +244,10 @@ def train(args, train_dataset, model, tokenizer):
 
     if args.local_rank in [-1, 0]:
         tb_writer.close()
-
+    output_metrics["best_acc"] = best_dev_acc
+    output_metrics["best_acc_step"] = best_steps
+    with open(args.output_dir + "/metrics.json", "w") as output_metric_fp:
+        json.dump(output_metrics, output_metric_fp)
     return global_step, tr_loss / global_step, best_steps
 
 
@@ -340,7 +346,7 @@ def load_and_cache_examples(args, task, tokenizer, evaluate=False, test=False):
         cached_mode = "train"
     assert not (evaluate and test)
     cached_features_file = os.path.join(
-        args.data_dir,
+        args.output_dir,
         "cached_{}_{}_{}_{}".format(
             cached_mode,
             list(filter(None, args.model_name_or_path.split("/"))).pop(),

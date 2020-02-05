@@ -1245,6 +1245,11 @@ class PreTrainedTokenizer(object):
             window_len = min(len(ids), stride + num_tokens_to_remove)
             overflowing_tokens = ids[-window_len:]
             ids = ids[:-num_tokens_to_remove]
+        elif truncation_strategy == "only_first_front":
+            assert len(ids) > num_tokens_to_remove
+            window_len = min(len(ids), stride + num_tokens_to_remove)
+            overflowing_tokens = ids[:window_len]
+            ids = ids[num_tokens_to_remove:]
         elif truncation_strategy == "only_second":
             assert pair_ids is not None and len(pair_ids) > num_tokens_to_remove
             window_len = min(len(pair_ids), stride + num_tokens_to_remove)

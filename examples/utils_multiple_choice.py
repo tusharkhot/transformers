@@ -310,14 +310,12 @@ def convert_examples_to_features(
             logger.info("Writing example %d of %d" % (ex_index, len(examples)))
         choices_features = []
         for ending_idx, (context, ending) in enumerate(zip(example.contexts, example.endings)):
-            text_a = context
-            if example.question.find("_") != -1:
-                # this is for cloze question
-                text_b = example.question.replace("_", ending)
-            else:
-                text_b = example.question + " " + ending
-
-            inputs = tokenizer.encode_plus(text_a, text_b, add_special_tokens=True, max_length=max_length,)
+            text_a = context + " " + example.question
+            text_b = ending
+            inputs = tokenizer.encode_plus(text_a, text_b, add_special_tokens=True,
+                                           max_length=max_length,
+                                           truncation_strategy="only_first_front",
+                                           return_overflowing_tokens=True)
             if "num_truncated_tokens" in inputs and inputs["num_truncated_tokens"] > 0:
                 logger.info(
                     "Attention! you are cropping tokens (swag task is ok). "
@@ -351,13 +349,14 @@ def convert_examples_to_features(
 
         if ex_index < 2:
             logger.info("*** Example ***")
-            logger.info("race_id: {}".format(example.example_id))
+            logger.info("id: {}".format(example.example_id))
             for choice_idx, (input_ids, attention_mask, token_type_ids) in enumerate(choices_features):
                 logger.info("choice: {}".format(choice_idx))
                 logger.info("input_ids: {}".format(" ".join(map(str, input_ids))))
                 logger.info("attention_mask: {}".format(" ".join(map(str, attention_mask))))
                 logger.info("token_type_ids: {}".format(" ".join(map(str, token_type_ids))))
                 logger.info("label: {}".format(label))
+                logger.info("input tokens: {}".format(" ".join(tokenizer.convert_ids_to_tokens(input_ids))))
 
         features.append(InputFeatures(example_id=example.example_id, choices_features=choices_features, label=label,))
 

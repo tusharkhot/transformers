@@ -310,7 +310,7 @@ def convert_examples_to_features(
             logger.info("Writing example %d of %d" % (ex_index, len(examples)))
         choices_features = []
         for ending_idx, (context, ending) in enumerate(zip(example.contexts, example.endings)):
-            text_a = context + " " + example.question
+            text_a = context + tokenizer.sep_token + example.question
             text_b = ending
             inputs = tokenizer.encode_plus(text_a, text_b, add_special_tokens=True,
                                            max_length=max_length,

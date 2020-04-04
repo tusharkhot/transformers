@@ -37,7 +37,7 @@ from transformers import (
     XLMWithLMHeadModel,
     XLNetLMHeadModel,
     XLNetTokenizer,
-)
+    T5ForConditionalGeneration, T5Tokenizer)
 
 
 logging.basicConfig(
@@ -54,6 +54,7 @@ MODEL_CLASSES = {
     "xlnet": (XLNetLMHeadModel, XLNetTokenizer),
     "transfo-xl": (TransfoXLLMHeadModel, TransfoXLTokenizer),
     "xlm": (XLMWithLMHeadModel, XLMTokenizer),
+    "t5": (T5ForConditionalGeneration, T5Tokenizer)
 }
 
 # Padding text to help Transformer-XL and XLNet with short prompts as proposed by Aman Rusia

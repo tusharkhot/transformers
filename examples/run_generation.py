@@ -222,16 +222,20 @@ def main():
     else:
         encoded_prompt = tokenizer.encode(prompt_text, add_special_tokens=False, return_tensors="pt")
     encoded_prompt = encoded_prompt.to(args.device)
-
+    if model.config.is_encoder_decoder:
+        max_len = args.length
+    else:
+        max_len = args.length + len(encoded_prompt[0])
     output_sequences = model.generate(
         input_ids=encoded_prompt,
-        max_length=args.length + len(encoded_prompt[0]),
+        max_length=max_len,
         temperature=args.temperature,
         top_k=args.k,
         top_p=args.p,
         repetition_penalty=args.repetition_penalty,
         do_sample=True,
         num_return_sequences=args.num_return_sequences,
+        decoder_start_token_id=tokenizer.eos_token_id
     )
 
     # Remove the batch dimension when returning multiple sequences
@@ -249,7 +253,7 @@ def main():
         # Remove all text after the stop token
         text = text[: text.find(args.stop_token) if args.stop_token else None]
 
-        if args.model_type == "t5":
+        if model.config.is_encoder_decoder:
             total_sequence = (
                     prompt_text + text
             )

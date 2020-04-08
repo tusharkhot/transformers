@@ -92,16 +92,18 @@ class ConditionalTextDataset(Dataset):
             tokenized_rhs = tokenizer.convert_tokens_to_ids(tokenizer.tokenize(rhs_str))
             self._truncate_seq_pair(tokenized_lhs, tokenized_rhs,
                                     max_length=block_size - 1)
-            token_ids = tokenized_lhs + tokenized_rhs + \
-                        tokenizer.convert_tokens_to_ids([tokenizer.eos_token])
-            token_labels = [-100] * len(tokenized_lhs) + token_ids[len(tokenized_lhs):]
-            # Padding not needed here
-
-            if len(token_ids) > block_size:  # Truncate in block of block_size
-                raise ValueError("Unexpected #tokens ({}) > block size ({}).".format(
-                    len(token_ids), block_size))
-            else:
-                self.examples.append((token_ids, token_labels))
+            attention_mask = [1] * len(tokenized_lhs)
+            self.examples.append((tokenized_lhs,  # input
+                                 tokenized_rhs + tokenizer.convert_tokens_to_ids([tokenizer.eos_token]), #labels
+                                 attention_mask,  # mask
+                                 tokenizer.convert_tokens_to_ids([tokenizer.eos_token]) + tokenized_rhs # decoder
+                                 ))
+            if len(self.examples) < 5:
+                print(lhs_str)
+                print(rhs_str)
+                print(self.examples[-1][0])
+                print(self.examples[-1][1])
+                print(self.examples[-1][3])
 
     def _truncate_seq_pair(self, tokens_a, tokens_b, max_length):
         """Truncates a sequence pair in place to the maximum length."""
@@ -122,7 +124,9 @@ class ConditionalTextDataset(Dataset):
 
     def __getitem__(self, item):
         return (torch.tensor(self.examples[item][0], dtype=torch.long),
-                torch.tensor(self.examples[item][1], dtype=torch.long))
+                torch.tensor(self.examples[item][1], dtype=torch.long),
+                torch.tensor(self.examples[item][2], dtype=torch.long),
+                torch.tensor(self.examples[item][3], dtype=torch.long))
 
 
 class TextDataset(Dataset):
@@ -382,11 +386,14 @@ def train(args, train_dataset, model: PreTrainedModel, tokenizer: PreTrainedToke
                 steps_trained_in_current_epoch -= 1
                 continue
 
-            inputs, labels = get_input_labels(batch=batch, args=args, tokenizer=tokenizer)
+            inputs, labels, mask, decoder_input = get_input_labels(batch=batch, args=args, tokenizer=tokenizer)
             inputs = inputs.to(args.device)
             labels = labels.to(args.device)
+            mask = mask.to(args.device) if mask is not None else None
+            decoder_input = decoder_input.to(args.device) if decoder_input is not None else None
             model.train()
-            outputs = model(inputs, masked_lm_labels=labels) if args.mlm else model(inputs, labels=labels)
+            outputs = model(inputs, masked_lm_labels=labels) if args.mlm else \
+                model(inputs, labels=labels, attention_mask=mask, decoder_input_ids=decoder_input)
             loss = outputs[0]  # model outputs are always tuple in transformers (see doc)
             if args.n_gpu > 1:
                 loss = loss.mean()  # mean() to average on multi-gpu parallel training
@@ -456,8 +463,10 @@ def train(args, train_dataset, model: PreTrainedModel, tokenizer: PreTrainedToke
 
 
 def get_input_labels(batch, tokenizer, args):
+    mask = None
+    decoder_input = None
     if args.conditional:
-        inputs, labels = batch
+        inputs, labels, mask, decoder_input = batch
         # # hack to replace padding token with -1
         # if tokenizer._pad_token is not None:
         #     labels[labels == tokenizer.pad_token_id] = -1
@@ -468,27 +477,33 @@ def get_input_labels(batch, tokenizer, args):
     else:
         inputs, labels = batch, batch
 
-    return inputs, labels
+    return inputs, labels, mask, decoder_input
 
 
 def create_dataloader(args, dataset, tokenizer, batch_size, for_train):
 
     def collate(input: List[torch.Tensor]):
         # separate out labels for conditional dataset
+        if tokenizer._pad_token is None:
+            pad_token = tokenizer.eos_token_id
+        else:
+            pad_token = tokenizer.pad_token_id
         if args.conditional:
-            examples, labels = zip(*input)
+            examples, labels, masks, decoder_input = zip(*input)
             # pad labels
             new_labels = pad_sequence(labels, batch_first=True, padding_value=-100)
+            new_masks = pad_sequence(masks, batch_first=True, padding_value=0)
+            new_decoder_input = pad_sequence(decoder_input, batch_first=True, padding_value=pad_token)
         else:
             examples = input
         # pad input ids
         if tokenizer._pad_token is None:
             new_examples = pad_sequence(examples, batch_first=True)
         else:
-            new_examples = pad_sequence(examples, batch_first=True, padding_value=tokenizer.pad_token_id)
+            new_examples = pad_sequence(examples, batch_first=True, padding_value=pad_token)
         # return tuple for conditional
         if args.conditional:
-            return [new_examples, new_labels]
+            return [new_examples, new_labels, new_masks, new_decoder_input]
         else:
             return new_examples
 
@@ -534,13 +549,14 @@ def evaluate(args, model: PreTrainedModel, tokenizer: PreTrainedTokenizer, prefi
     model.eval()
 
     for batch in tqdm(eval_dataloader, desc="Evaluating"):
-        inputs, labels = get_input_labels(batch=batch, args=args, tokenizer=tokenizer)
+        inputs, labels, mask, decoder_input = get_input_labels(batch=batch, args=args, tokenizer=tokenizer)
         inputs = inputs.to(args.device)
         labels = labels.to(args.device)
-
+        mask = mask.to(args.device) if mask is not None else None
+        decoder_input = decoder_input.to(args.device) if decoder_input is not None else None
         with torch.no_grad():
-            outputs = model(inputs, masked_lm_labels=labels) if args.mlm else model(inputs,
-                                                                                    labels=labels)
+            outputs = model(inputs, masked_lm_labels=labels) if args.mlm else \
+                model(inputs, labels=labels, attention_mask=mask, decoder_input_ids=decoder_input)
             lm_loss = outputs[0]
             eval_loss += lm_loss.mean().item()
         nb_eval_steps += 1

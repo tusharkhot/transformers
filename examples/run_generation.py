@@ -37,7 +37,7 @@ from transformers import (
     XLMWithLMHeadModel,
     XLNetLMHeadModel,
     XLNetTokenizer,
-    T5ForConditionalGeneration, T5Tokenizer)
+    T5ForConditionalGeneration, T5Tokenizer, BartForConditionalGeneration, BartTokenizer)
 
 
 logging.basicConfig(
@@ -54,7 +54,8 @@ MODEL_CLASSES = {
     "xlnet": (XLNetLMHeadModel, XLNetTokenizer),
     "transfo-xl": (TransfoXLLMHeadModel, TransfoXLTokenizer),
     "xlm": (XLMWithLMHeadModel, XLMTokenizer),
-    "t5": (T5ForConditionalGeneration, T5Tokenizer)
+    "t5": (T5ForConditionalGeneration, T5Tokenizer),
+    "bart": (BartForConditionalGeneration, BartTokenizer)
 }
 
 # Padding text to help Transformer-XL and XLNet with short prompts as proposed by Aman Rusia
@@ -245,14 +246,18 @@ def main():
 
         # Decode text
         text = tokenizer.decode(generated_sequence, clean_up_tokenization_spaces=True)
-
         # Remove all text after the stop token
         text = text[: text.find(args.stop_token) if args.stop_token else None]
 
-        # Add the prompt at the beginning of the sequence. Remove the excess text that was used for pre-processing
-        total_sequence = (
-            prompt_text + text[len(tokenizer.decode(encoded_prompt[0], clean_up_tokenization_spaces=True)) :]
-        )
+        if args.model_type == "t5":
+            total_sequence = (
+                    prompt_text + text
+            )
+        else:
+            # Add the prompt at the beginning of the sequence. Remove the excess text that was used for pre-processing
+            total_sequence = (
+                prompt_text + text[len(tokenizer.decode(encoded_prompt[0], clean_up_tokenization_spaces=True)) :]
+            )
 
         generated_sequences.append(total_sequence)
         print(total_sequence)

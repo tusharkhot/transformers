@@ -19,9 +19,9 @@ GPT and GPT-2 are fine-tuned using a causal language modeling (CLM) loss while B
 using a masked language modeling (MLM) loss.
 """
 
-
 import argparse
 import glob
+import json
 import logging
 import os
 import pickle
@@ -49,18 +49,80 @@ from transformers import (
     get_linear_schedule_with_warmup,
 )
 
-
 try:
     from torch.utils.tensorboard import SummaryWriter
 except ImportError:
     from tensorboardX import SummaryWriter
 
-
 logger = logging.getLogger(__name__)
-
 
 MODEL_CONFIG_CLASSES = list(MODEL_WITH_LM_HEAD_MAPPING.keys())
 MODEL_TYPES = tuple(conf.model_type for conf in MODEL_CONFIG_CLASSES)
+
+
+class ConditionalTextDataset(Dataset):
+
+    def __init__(self, tokenizer: PreTrainedTokenizer, args, file_path: str, block_size=512):
+        lines = []
+        if args.line_by_line:
+            with open(file_path, encoding="utf-8") as f:
+                lines = [line for line in f if (len(line) > 0 and not line.isspace())]
+        else:
+            with open(file_path, encoding="utf-8") as f:
+                for line in f:
+                    input_json = json.loads(line)
+                    if "train_seq" in input_json:
+                        lines.append(input_json["train_seq"])
+                    elif "train_seqs" in input_json:
+                        lines.extend(input_json["train_seqs"])
+                    else:
+                        raise ValueError("No training sequences in input json: {}".format(line))
+
+        self.examples = []
+        split_str = args.conditional_split
+        for text in lines:
+            if split_str is not None and len(split_str) > 0:
+                rhs_start_idx = text.index(split_str) + len(split_str)
+            else:
+                rhs_start_idx = 0
+            lhs_str = text[:rhs_start_idx]
+            rhs_str = text[rhs_start_idx:]
+
+            tokenized_lhs = tokenizer.convert_tokens_to_ids(tokenizer.tokenize(lhs_str))
+            tokenized_rhs = tokenizer.convert_tokens_to_ids(tokenizer.tokenize(rhs_str))
+            self._truncate_seq_pair(tokenized_lhs, tokenized_rhs,
+                                    max_length=block_size - 1)
+            token_ids = tokenized_lhs + tokenized_rhs + \
+                        tokenizer.convert_tokens_to_ids([tokenizer.eos_token])
+            token_labels = [-100] * len(tokenized_lhs) + token_ids[len(tokenized_lhs):]
+            # Padding not needed here
+
+            if len(token_ids) > block_size:  # Truncate in block of block_size
+                raise ValueError("Unexpected #tokens ({}) > block size ({}).".format(
+                    len(token_ids), block_size))
+            else:
+                self.examples.append((token_ids, token_labels))
+
+    def _truncate_seq_pair(self, tokens_a, tokens_b, max_length):
+        """Truncates a sequence pair in place to the maximum length."""
+        # This is a simple heuristic which will always truncate the longer sequence
+        # one token at a time. tokens_a is always truncated from the beginning and tokens_b is
+        # truncated from the end.
+        while True:
+            total_length = len(tokens_a) + len(tokens_b)
+            if total_length <= max_length:
+                break
+            if len(tokens_a) > len(tokens_b):
+                tokens_a.pop(0)
+            else:
+                tokens_b.pop()
+
+    def __len__(self):
+        return len(self.examples)
+
+    def __getitem__(self, item):
+        return (torch.tensor(self.examples[item][0], dtype=torch.long),
+                torch.tensor(self.examples[item][1], dtype=torch.long))
 
 
 class TextDataset(Dataset):
@@ -126,7 +188,9 @@ class LineByLineTextDataset(Dataset):
 
 def load_and_cache_examples(args, tokenizer, evaluate=False):
     file_path = args.eval_data_file if evaluate else args.train_data_file
-    if args.line_by_line:
+    if args.conditional:
+        return ConditionalTextDataset(tokenizer, args, file_path=file_path)
+    elif args.line_by_line:
         return LineByLineTextDataset(tokenizer, args, file_path=file_path, block_size=args.block_size)
     else:
         return TextDataset(tokenizer, args, file_path=file_path, block_size=args.block_size)
@@ -216,16 +280,8 @@ def train(args, train_dataset, model: PreTrainedModel, tokenizer: PreTrainedToke
         tb_writer = SummaryWriter()
 
     args.train_batch_size = args.per_gpu_train_batch_size * max(1, args.n_gpu)
-
-    def collate(examples: List[torch.Tensor]):
-        if tokenizer._pad_token is None:
-            return pad_sequence(examples, batch_first=True)
-        return pad_sequence(examples, batch_first=True, padding_value=tokenizer.pad_token_id)
-
-    train_sampler = RandomSampler(train_dataset) if args.local_rank == -1 else DistributedSampler(train_dataset)
-    train_dataloader = DataLoader(
-        train_dataset, sampler=train_sampler, batch_size=args.train_batch_size, collate_fn=collate
-    )
+    train_dataloader = create_dataloader(args, train_dataset, tokenizer, args.train_batch_size,
+                                         for_train=True)
 
     if args.max_steps > 0:
         t_total = args.max_steps
@@ -326,13 +382,12 @@ def train(args, train_dataset, model: PreTrainedModel, tokenizer: PreTrainedToke
                 steps_trained_in_current_epoch -= 1
                 continue
 
-            inputs, labels = mask_tokens(batch, tokenizer, args) if args.mlm else (batch, batch)
+            inputs, labels = get_input_labels(batch=batch, args=args, tokenizer=tokenizer)
             inputs = inputs.to(args.device)
             labels = labels.to(args.device)
             model.train()
             outputs = model(inputs, masked_lm_labels=labels) if args.mlm else model(inputs, labels=labels)
             loss = outputs[0]  # model outputs are always tuple in transformers (see doc)
-
             if args.n_gpu > 1:
                 loss = loss.mean()  # mean() to average on multi-gpu parallel training
             if args.gradient_accumulation_steps > 1:
@@ -400,6 +455,59 @@ def train(args, train_dataset, model: PreTrainedModel, tokenizer: PreTrainedToke
     return global_step, tr_loss / global_step
 
 
+def get_input_labels(batch, tokenizer, args):
+    if args.conditional:
+        inputs, labels = batch
+        # # hack to replace padding token with -1
+        # if tokenizer._pad_token is not None:
+        #     labels[labels == tokenizer.pad_token_id] = -1
+        # else:
+        #     labels[labels == 0] = -1
+    elif args.mlm:
+        inputs, labels = mask_tokens(batch, tokenizer, args)
+    else:
+        inputs, labels = batch, batch
+
+    return inputs, labels
+
+
+def create_dataloader(args, dataset, tokenizer, batch_size, for_train):
+
+    def collate(input: List[torch.Tensor]):
+        # separate out labels for conditional dataset
+        if args.conditional:
+            examples, labels = zip(*input)
+            # pad labels
+            new_labels = pad_sequence(labels, batch_first=True, padding_value=-100)
+        else:
+            examples = input
+        # pad input ids
+        if tokenizer._pad_token is None:
+            new_examples = pad_sequence(examples, batch_first=True)
+        else:
+            new_examples = pad_sequence(examples, batch_first=True, padding_value=tokenizer.pad_token_id)
+        # return tuple for conditional
+        if args.conditional:
+            return [new_examples, new_labels]
+        else:
+            return new_examples
+
+    if for_train:
+        train_sampler = RandomSampler(dataset) if args.local_rank == -1 else DistributedSampler(
+            dataset)
+        train_dataloader = DataLoader(
+            dataset, sampler=train_sampler, batch_size=batch_size, collate_fn=collate
+        )
+        return train_dataloader
+    else:
+        # Note that DistributedSampler samples randomly
+        eval_sampler = SequentialSampler(dataset)
+        eval_dataloader = DataLoader(
+            dataset, sampler=eval_sampler, batch_size=batch_size, collate_fn=collate
+        )
+        return eval_dataloader
+
+
 def evaluate(args, model: PreTrainedModel, tokenizer: PreTrainedTokenizer, prefix="") -> Dict:
     # Loop to handle MNLI double evaluation (matched, mis-matched)
     eval_output_dir = args.output_dir
@@ -410,17 +518,8 @@ def evaluate(args, model: PreTrainedModel, tokenizer: PreTrainedTokenizer, prefi
         os.makedirs(eval_output_dir, exist_ok=True)
 
     args.eval_batch_size = args.per_gpu_eval_batch_size * max(1, args.n_gpu)
-    # Note that DistributedSampler samples randomly
-
-    def collate(examples: List[torch.Tensor]):
-        if tokenizer._pad_token is None:
-            return pad_sequence(examples, batch_first=True)
-        return pad_sequence(examples, batch_first=True, padding_value=tokenizer.pad_token_id)
-
-    eval_sampler = SequentialSampler(eval_dataset)
-    eval_dataloader = DataLoader(
-        eval_dataset, sampler=eval_sampler, batch_size=args.eval_batch_size, collate_fn=collate
-    )
+    eval_dataloader = create_dataloader(args, eval_dataset, tokenizer, args.eval_batch_size,
+                                         for_train=False)
 
     # multi-gpu evaluate
     if args.n_gpu > 1:
@@ -435,12 +534,13 @@ def evaluate(args, model: PreTrainedModel, tokenizer: PreTrainedTokenizer, prefi
     model.eval()
 
     for batch in tqdm(eval_dataloader, desc="Evaluating"):
-        inputs, labels = mask_tokens(batch, tokenizer, args) if args.mlm else (batch, batch)
+        inputs, labels = get_input_labels(batch=batch, args=args, tokenizer=tokenizer)
         inputs = inputs.to(args.device)
         labels = labels.to(args.device)
 
         with torch.no_grad():
-            outputs = model(inputs, masked_lm_labels=labels) if args.mlm else model(inputs, labels=labels)
+            outputs = model(inputs, masked_lm_labels=labels) if args.mlm else model(inputs,
+                                                                                    labels=labels)
             lm_loss = outputs[0]
             eval_loss += lm_loss.mean().item()
         nb_eval_steps += 1
@@ -504,6 +604,15 @@ def main():
     )
     parser.add_argument(
         "--mlm_probability", type=float, default=0.15, help="Ratio of tokens to mask for masked language modeling loss"
+    )
+    parser.add_argument(
+        "--conditional", action="store_true", help="Train to produce output conditioned on the input."
+    )
+    parser.add_argument(
+        "--conditional_split",
+        default="\t",
+        type=str,
+        help="Split each line on this string to produce input-output pairs",
     )
 
     parser.add_argument(

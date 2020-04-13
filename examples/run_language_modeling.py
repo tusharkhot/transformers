@@ -28,6 +28,7 @@ import pickle
 import random
 import re
 import shutil
+from math import ceil
 from typing import Dict, List, Tuple
 
 import numpy as np
@@ -319,8 +320,12 @@ def train(args, train_dataset, model: PreTrainedModel, tokenizer: PreTrainedToke
         {"params": [p for n, p in model.named_parameters() if any(nd in n for nd in no_decay)], "weight_decay": 0.0},
     ]
     optimizer = AdamW(optimizer_grouped_parameters, lr=args.learning_rate, eps=args.adam_epsilon)
+    if 1 > args.warmup_steps > 0:
+        warmup_steps = ceil(t_total * args.warmup_steps)
+    else:
+        warmup_steps = args.warmup_steps
     scheduler = get_linear_schedule_with_warmup(
-        optimizer, num_warmup_steps=args.warmup_steps, num_training_steps=t_total
+        optimizer, num_warmup_steps=warmup_steps, num_training_steps=t_total
     )
 
     # Check if saved optimizer or scheduler states exist
@@ -708,7 +713,7 @@ def main():
         type=int,
         help="If > 0: set total number of training steps to perform. Override num_train_epochs.",
     )
-    parser.add_argument("--warmup_steps", default=0, type=int, help="Linear warmup over warmup_steps.")
+    parser.add_argument("--warmup_steps", default=0, type=float, help="Linear warmup over warmup_steps.")
 
     parser.add_argument("--logging_steps", type=int, default=500, help="Log every X updates steps.")
     parser.add_argument("--save_steps", type=int, default=500, help="Save checkpoint every X updates steps.")

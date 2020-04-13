@@ -384,7 +384,9 @@ def train(args, train_dataset, model: PreTrainedModel, tokenizer: PreTrainedToke
             logger.info("  Starting fine-tuning.")
 
     tr_loss, logging_loss = 0.0, 0.0
-
+    output_metrics = {}
+    best_perp = 1e8
+    best_perp_step = -1
     model.zero_grad()
     train_iterator = trange(
         epochs_trained, int(args.num_train_epochs), desc="Epoch", disable=args.local_rank not in [-1, 0]
@@ -438,6 +440,10 @@ def train(args, train_dataset, model: PreTrainedModel, tokenizer: PreTrainedToke
                         results = evaluate(args, model, tokenizer)
                         for key, value in results.items():
                             tb_writer.add_scalar("eval_{}".format(key), value, global_step)
+                            output_metrics[f"{global_step}.{key}"] = value
+                        if results["perplexity"] < best_perp:
+                            best_perp_step = global_step
+                            best_perp = results["perplexity"]
                     tb_writer.add_scalar("lr", scheduler.get_lr()[0], global_step)
                     tb_writer.add_scalar("loss", (tr_loss - logging_loss) / args.logging_steps, global_step)
                     logging_loss = tr_loss
@@ -471,7 +477,10 @@ def train(args, train_dataset, model: PreTrainedModel, tokenizer: PreTrainedToke
 
     if args.local_rank in [-1, 0]:
         tb_writer.close()
-
+    output_metrics["best_perp"] = best_perp
+    output_metrics["best_perp_step"] = best_perp_step
+    with open(args.output_dir + "/metrics.json", "w") as output_metric_fp:
+        json.dump(output_metrics, output_metric_fp)
     return global_step, tr_loss / global_step
 
 

@@ -18,6 +18,7 @@
 
 import argparse
 import glob
+import json
 import logging
 import os
 import random
@@ -98,8 +99,12 @@ def train(args, train_dataset, model, tokenizer):
         {"params": [p for n, p in model.named_parameters() if any(nd in n for nd in no_decay)], "weight_decay": 0.0},
     ]
     optimizer = AdamW(optimizer_grouped_parameters, lr=args.learning_rate, eps=args.adam_epsilon)
+    if 1 > args.warmup_steps > 0:
+        warmup_steps = ceil(t_total * args.warmup_steps)
+    else:
+        warmup_steps = args.warmup_steps
     scheduler = get_linear_schedule_with_warmup(
-        optimizer, num_warmup_steps=args.warmup_steps, num_training_steps=t_total
+        optimizer, num_warmup_steps=warmup_steps, num_training_steps=t_total
     )
 
     # Check if saved optimizer or scheduler states exist
@@ -162,6 +167,9 @@ def train(args, train_dataset, model, tokenizer):
             logger.info("  Starting fine-tuning.")
 
     tr_loss, logging_loss = 0.0, 0.0
+    output_metrics = {}
+    best_f1 = 0
+    best_f1_step = -1
     model.zero_grad()
     train_iterator = trange(
         epochs_trained, int(args.num_train_epochs), desc="Epoch", disable=args.local_rank not in [-1, 0]
@@ -235,6 +243,10 @@ def train(args, train_dataset, model, tokenizer):
                         results = evaluate(args, model, tokenizer)
                         for key, value in results.items():
                             tb_writer.add_scalar("eval_{}".format(key), value, global_step)
+                            output_metrics[f"{global_step}.{key}"] = value
+                        if results["f1"] > best_f1:
+                            best_f1_step = global_step
+                            best_f1 = results["f1"]
                     tb_writer.add_scalar("lr", scheduler.get_lr()[0], global_step)
                     tb_writer.add_scalar("loss", (tr_loss - logging_loss) / args.logging_steps, global_step)
                     logging_loss = tr_loss
@@ -265,7 +277,10 @@ def train(args, train_dataset, model, tokenizer):
 
     if args.local_rank in [-1, 0]:
         tb_writer.close()
-
+    output_metrics["best_f1"] = best_f1
+    output_metrics["best_f1_step"] = best_f1_step
+    with open(args.output_dir + "/metrics.json", "w") as output_metric_fp:
+        json.dump(output_metrics, output_metric_fp)
     return global_step, tr_loss / global_step
 
 
@@ -602,7 +617,7 @@ def main():
         type=int,
         help="If > 0: set total number of training steps to perform. Override num_train_epochs.",
     )
-    parser.add_argument("--warmup_steps", default=0, type=int, help="Linear warmup over warmup_steps.")
+    parser.add_argument("--warmup_steps", default=0, type=float, help="Linear warmup over warmup_steps.")
     parser.add_argument(
         "--n_best_size",
         default=20,

@@ -64,46 +64,59 @@ class ConditionalTextDataset(Dataset):
 
     def __init__(self, tokenizer: PreTrainedTokenizer, args, file_path: str, block_size=512):
         lines = []
-        if args.line_by_line:
-            with open(file_path, encoding="utf-8") as f:
-                lines = [line for line in f if (len(line) > 0 and not line.isspace())]
+        directory, filename = os.path.split(file_path)
+        cached_features_file = os.path.join(
+            args.output_dir, args.model_type + "_cached_lm_" + str(block_size) + "_" + filename
+        )
+
+        if os.path.exists(cached_features_file) and not args.overwrite_cache:
+            logger.info("Loading features from cached file %s", cached_features_file)
+            with open(cached_features_file, "rb") as handle:
+                self.examples = pickle.load(handle)
         else:
-            with open(file_path, encoding="utf-8") as f:
-                for line in f:
-                    input_json = json.loads(line)
-                    if "train_seq" in input_json:
-                        lines.append(input_json["train_seq"])
-                    elif "train_seqs" in input_json:
-                        lines.extend(input_json["train_seqs"])
-                    else:
-                        raise ValueError("No training sequences in input json: {}".format(line))
-
-        self.examples = []
-        split_str = args.conditional_split
-        for text in lines:
-            if split_str is not None and len(split_str) > 0:
-                rhs_start_idx = text.index(split_str) + len(split_str)
+            if args.line_by_line:
+                with open(file_path, encoding="utf-8") as f:
+                    lines = [line for line in f if (len(line) > 0 and not line.isspace())]
             else:
-                rhs_start_idx = 0
-            lhs_str = text[:rhs_start_idx]
-            rhs_str = text[rhs_start_idx:]
+                with open(file_path, encoding="utf-8") as f:
+                    for line in f:
+                        input_json = json.loads(line)
+                        if "train_seq" in input_json:
+                            lines.append(input_json["train_seq"])
+                        elif "train_seqs" in input_json:
+                            lines.extend(input_json["train_seqs"])
+                        else:
+                            raise ValueError("No training sequences in input json: {}".format(line))
 
-            tokenized_lhs = tokenizer.convert_tokens_to_ids(tokenizer.tokenize(lhs_str))
-            tokenized_rhs = tokenizer.convert_tokens_to_ids(tokenizer.tokenize(rhs_str))
-            self._truncate_seq_pair(tokenized_lhs, tokenized_rhs,
-                                    max_length=block_size - 1)
-            attention_mask = [1] * len(tokenized_lhs)
-            self.examples.append((tokenized_lhs,  # input
-                                 tokenized_rhs + tokenizer.convert_tokens_to_ids([tokenizer.eos_token]), #labels
-                                 attention_mask,  # mask
-                                 tokenizer.convert_tokens_to_ids([tokenizer.eos_token]) + tokenized_rhs # decoder
-                                 ))
-            if len(self.examples) < 5:
-                print(lhs_str)
-                print(rhs_str)
-                print(self.examples[-1][0])
-                print(self.examples[-1][1])
-                print(self.examples[-1][3])
+            self.examples = []
+            split_str = args.conditional_split
+            for text in lines:
+                if split_str is not None and len(split_str) > 0:
+                    rhs_start_idx = text.index(split_str) + len(split_str)
+                else:
+                    rhs_start_idx = 0
+                lhs_str = text[:rhs_start_idx]
+                rhs_str = text[rhs_start_idx:]
+
+                tokenized_lhs = tokenizer.convert_tokens_to_ids(tokenizer.tokenize(lhs_str))
+                tokenized_rhs = tokenizer.convert_tokens_to_ids(tokenizer.tokenize(rhs_str))
+                self._truncate_seq_pair(tokenized_lhs, tokenized_rhs,
+                                        max_length=block_size - 1)
+                attention_mask = [1] * len(tokenized_lhs)
+                self.examples.append((tokenized_lhs,  # input
+                                     tokenized_rhs + tokenizer.convert_tokens_to_ids([tokenizer.eos_token]), #labels
+                                     attention_mask,  # mask
+                                     tokenizer.convert_tokens_to_ids([tokenizer.eos_token]) + tokenized_rhs # decoder
+                                     ))
+                if len(self.examples) < 5:
+                    print(lhs_str)
+                    print(rhs_str)
+                    print(self.examples[-1][0])
+                    print(self.examples[-1][1])
+                    print(self.examples[-1][3])
+            logger.info("Saving features into cached file %s", cached_features_file)
+            with open(cached_features_file, "wb") as handle:
+                pickle.dump(self.examples, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
     def _truncate_seq_pair(self, tokens_a, tokens_b, max_length):
         """Truncates a sequence pair in place to the maximum length."""

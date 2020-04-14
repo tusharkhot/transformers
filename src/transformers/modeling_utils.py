@@ -323,6 +323,9 @@ class PreTrainedModel(nn.Module, ModuleUtilsMixin):
     def save_pretrained(self, save_directory):
         """ Save a model and its configuration file to a directory, so that it
             can be re-loaded using the `:func:`~transformers.PreTrainedModel.from_pretrained`` class method.
+
+            Arguments:
+                save_directory: directory to which to save.
         """
         assert os.path.isdir(
             save_directory
@@ -334,12 +337,21 @@ class PreTrainedModel(nn.Module, ModuleUtilsMixin):
         # Attach architecture to the config
         model_to_save.config.architectures = [model_to_save.__class__.__name__]
 
-        # Save configuration file
-        model_to_save.config.save_pretrained(save_directory)
-
         # If we save using the predefined names, we can load using `from_pretrained`
         output_model_file = os.path.join(save_directory, WEIGHTS_NAME)
-        torch.save(model_to_save.state_dict(), output_model_file)
+
+        if hasattr(self.config, "xla_device") and self.config.xla_device:
+            import torch_xla.core.xla_model as xm
+
+            if xm.is_master_ordinal():
+                # Save configuration file
+                model_to_save.config.save_pretrained(save_directory)
+            # xm.save takes care of saving only from master
+            xm.save(model_to_save.state_dict(), output_model_file)
+        else:
+            model_to_save.config.save_pretrained(save_directory)
+            torch.save(model_to_save.state_dict(), output_model_file)
+
         logger.info("Model weights saved in {}".format(output_model_file))
 
     @classmethod
@@ -626,6 +638,12 @@ class PreTrainedModel(nn.Module, ModuleUtilsMixin):
             }
             return model, loading_info
 
+        if hasattr(config, "xla_device") and config.xla_device:
+            import torch_xla.core.xla_model as xm
+
+            model = xm.send_cpu_data_to_device(model, xm.xla_device())
+            model = model.to(xm.xla_device())
+
         return model
 
     def prepare_inputs_for_generation(self, input_ids, **kwargs):
@@ -634,15 +652,13 @@ class PreTrainedModel(nn.Module, ModuleUtilsMixin):
     def prepare_scores_for_generation(self, scores, **kwargs):
         return scores
 
-    def _do_output_past(self, outputs):
+    def _use_cache(self, outputs, use_cache):
         """During generation, decide whether to pass the `past` variable to the next forward pass."""
-        has_output_past = getattr(self.config, "output_past", False)
-        mem_len = getattr(self.config, "mem_len", 0)
-        if len(outputs) <= 1:
+        if len(outputs) <= 1 or use_cache is False:
             return False
-        if mem_len > 0 or has_output_past:
-            return True
-        return False
+        if hasattr(self.config, "mem_len") and self.config.mem_len == 0:
+            return False
+        return True
 
     def enforce_repetition_penalty_(self, lprobs, batch_size, num_beams, prev_output_tokens, repetition_penalty):
         """repetition penalty (from CTRL paper https://arxiv.org/abs/1909.05858). """
@@ -676,6 +692,7 @@ class PreTrainedModel(nn.Module, ModuleUtilsMixin):
         num_return_sequences=None,
         attention_mask=None,
         decoder_start_token_id=None,
+        use_cache=None,
     ):
         r""" Generates sequences for models with a LM head. The method currently supports greedy decoding, beam-search decoding, sampling with temperature, sampling with top-k or nucleus sampling.
 
@@ -750,6 +767,9 @@ class PreTrainedModel(nn.Module, ModuleUtilsMixin):
                 If an encoder-decoder model starts decoding with a different token than BOS.
                 Defaults to `None` and is changed to `BOS` later.
 
+            use_cache: (`optional`) bool
+                If `use_cache` is True, past key values are used to speed up decoding if applicable to model. Defaults to `True`.
+
         Return:
 
             output: `torch.LongTensor` of shape `(batch_size * num_return_sequences, sequence_length)`
@@ -804,6 +824,7 @@ class PreTrainedModel(nn.Module, ModuleUtilsMixin):
         min_length = min_length if min_length is not None else self.config.min_length
         do_sample = do_sample if do_sample is not None else self.config.do_sample
         early_stopping = early_stopping if early_stopping is not None else self.config.early_stopping
+        use_cache = use_cache if use_cache is not None else self.config.use_cache
         num_beams = num_beams if num_beams is not None else self.config.num_beams
         temperature = temperature if temperature is not None else self.config.temperature
         top_k = top_k if top_k is not None else self.config.top_k
@@ -833,6 +854,7 @@ class PreTrainedModel(nn.Module, ModuleUtilsMixin):
         assert isinstance(min_length, int) and min_length >= 0, "`min_length` should be a positive integer."
         assert isinstance(do_sample, bool), "`do_sample` should be a boolean."
         assert isinstance(early_stopping, bool), "`early_stopping` should be a boolean."
+        assert isinstance(use_cache, bool), "`use_cache` should be a boolean."
         assert isinstance(num_beams, int) and num_beams > 0, "`num_beams` should be a strictly positive integer."
         assert temperature > 0, "`temperature` should be strictly positive."
         assert isinstance(top_k, int) and top_k >= 0, "`top_k` should be a positive integer."
@@ -993,6 +1015,7 @@ class PreTrainedModel(nn.Module, ModuleUtilsMixin):
                 vocab_size=vocab_size,
                 encoder_outputs=encoder_outputs,
                 attention_mask=attention_mask,
+                use_cache=use_cache,
             )
         else:
             output = self._generate_no_beam_search(
@@ -1014,6 +1037,7 @@ class PreTrainedModel(nn.Module, ModuleUtilsMixin):
                 batch_size=effective_batch_size,
                 encoder_outputs=encoder_outputs,
                 attention_mask=attention_mask,
+                use_cache=use_cache,
             )
 
         return output
@@ -1038,6 +1062,7 @@ class PreTrainedModel(nn.Module, ModuleUtilsMixin):
         batch_size,
         encoder_outputs,
         attention_mask,
+        use_cache,
     ):
         """ Generate sequences for each example without beam search (num_beams == 1).
             All returned sequence are generated independantly.
@@ -1049,13 +1074,15 @@ class PreTrainedModel(nn.Module, ModuleUtilsMixin):
         past = encoder_outputs  # defined for encoder-decoder models, None for decoder-only models
 
         while cur_len < max_length:
-            model_inputs = self.prepare_inputs_for_generation(input_ids, past=past, attention_mask=attention_mask)
+            model_inputs = self.prepare_inputs_for_generation(
+                input_ids, past=past, attention_mask=attention_mask, use_cache=use_cache
+            )
 
             outputs = self(**model_inputs)
             next_token_logits = outputs[0][:, -1, :]
 
             # if model has past, then set the past variable to speed up decoding
-            if self._do_output_past(outputs):
+            if self._use_cache(outputs, use_cache):
                 past = outputs[1]
 
             # repetition penalty from CTRL paper (https://arxiv.org/abs/1909.05858)
@@ -1160,6 +1187,7 @@ class PreTrainedModel(nn.Module, ModuleUtilsMixin):
         vocab_size,
         encoder_outputs,
         attention_mask,
+        use_cache,
     ):
         """ Generate sequences for each example with beam search.
         """
@@ -1185,12 +1213,14 @@ class PreTrainedModel(nn.Module, ModuleUtilsMixin):
         done = [False for _ in range(batch_size)]
 
         while cur_len < max_length:
-            model_inputs = self.prepare_inputs_for_generation(input_ids, past=past, attention_mask=attention_mask)
+            model_inputs = self.prepare_inputs_for_generation(
+                input_ids, past=past, attention_mask=attention_mask, use_cache=use_cache
+            )
             outputs = self(**model_inputs)  # (batch_size * num_beams, cur_len, vocab_size)
             next_token_logits = outputs[0][:, -1, :]  # (batch_size * num_beams, vocab_size)
 
             # if model has past, then set the past variable to speed up decoding
-            if self._do_output_past(outputs):
+            if self._use_cache(outputs, use_cache):
                 past = outputs[1]
 
             # repetition penalty (from CTRL paper https://arxiv.org/abs/1909.05858)
@@ -1417,17 +1447,7 @@ class PreTrainedModel(nn.Module, ModuleUtilsMixin):
 
     @staticmethod
     def _reorder_cache(past, beam_idx):
-        reordered_past = []
-        for layer_past in past:
-            # get the correct batch idx from layer past batch dim
-            # batch dim of `past` and `mems` is at 2nd position
-            reordered_layer_past = [layer_past[:, i].unsqueeze(1).clone().detach() for i in beam_idx]
-            reordered_layer_past = torch.cat(reordered_layer_past, dim=1)
-            # check that shape matches
-            assert reordered_layer_past.shape == layer_past.shape
-            reordered_past.append(reordered_layer_past)
-        past = tuple(reordered_past)
-        return past
+        return tuple(layer_past.index_select(1, beam_idx) for layer_past in past)
 
 
 def calc_banned_ngram_tokens(prev_input_ids, num_hypos, no_repeat_ngram_size, cur_len):

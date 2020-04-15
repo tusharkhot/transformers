@@ -564,7 +564,7 @@ def compute_predictions_logits(
         with open(output_null_log_odds_file, "w") as writer:
             writer.write(json.dumps(scores_diff_json, indent=4) + "\n")
 
-    return all_predictions
+    return all_predictions, all_nbest_json
 
 
 def compute_predictions_log_probs(
@@ -754,4 +754,4 @@ def compute_predictions_log_probs(
         with open(output_null_log_odds_file, "w") as writer:
             writer.write(json.dumps(scores_diff_json, indent=4) + "\n")
 
-    return all_predictions
+    return all_predictions, all_nbest_json

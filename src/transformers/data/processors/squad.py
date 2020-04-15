@@ -315,12 +315,15 @@ def squad_convert_examples_to_features(
                 p.imap(annotate_, examples, chunksize=32),
                 total=len(examples),
                 desc="convert squad examples to features",
+                disable=(len(examples) < 20)
             )
         )
     new_features = []
     unique_id = 1000000000
     example_index = 0
-    for example_features in tqdm(features, total=len(features), desc="add example index and unique id"):
+    for example_features in tqdm(features, total=len(features),
+                                 disable=(len(features) < 20),
+                                 desc="add example index and unique id"):
         if not example_features:
             continue
         for example_feature in example_features:
@@ -525,7 +528,7 @@ class SquadProcessor(DataProcessor):
     def _create_examples(self, input_data, set_type):
         is_training = set_type == "train"
         examples = []
-        for entry in tqdm(input_data):
+        for entry in tqdm(input_data, disable=(len(input_data) < 20)):
             title = entry["title"]
             for paragraph in entry["paragraphs"]:
                 context_text = paragraph["context"]

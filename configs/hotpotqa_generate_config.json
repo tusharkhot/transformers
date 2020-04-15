@@ -1,0 +1,14 @@
+{
+  "squad": {
+    "type": "basic",
+    "qgen": {
+      "type": "lm",
+      "model_path": "data/squad/squad2_seq_paranvhints_json/bart_bart-large/"
+    },
+    "qa": {
+      "type": "lm",
+      "model_path": "data/squad/bert_output/",
+      "single_para": true
+    }
+  }
+}

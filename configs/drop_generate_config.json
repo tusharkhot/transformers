@@ -1,0 +1,35 @@
+{
+  "squad": {
+    "type": "basic",
+    "qgen": {
+      "type": "lm",
+      "model_path": "data/squad/squad2_seq_paranvhints_json/bart_bart-large/",
+      "num_samples": 5
+    },
+    "qa": {
+      "type": "lm",
+      "model_path": "data/squad/bert_output/"
+    }
+  },
+  "squad_list": {
+    "type": "basic",
+    "qgen": {
+      "type": "lm",
+      "model_path": "data/squad/squad2_seq_paranvhints_json/bart_bart-large/",
+      "num_samples": 5
+    },
+    "qa": {
+      "type": "lm_spans",
+      "model_path": "data/squad/bert_output/"
+    }
+  },
+  "math": {
+    "type": "basic",
+    "qgen": {
+      "type": "math_gen"
+    },
+    "qa": {
+      "type": "math_ver"
+    }
+  }
+}

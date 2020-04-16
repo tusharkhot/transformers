@@ -1,0 +1,5 @@
+# easier to specify what to include
+/*
+!/src/**
+!/examples/**
+!*

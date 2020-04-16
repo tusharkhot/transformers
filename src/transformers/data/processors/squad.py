@@ -83,7 +83,8 @@ def _is_whitespace(c):
     return False
 
 
-def squad_convert_example_to_features(example, max_seq_length, doc_stride, max_query_length, is_training):
+def squad_convert_example_to_features(example, max_seq_length, doc_stride, max_query_length,
+                                      is_training, pad_to_max=True):
     features = []
     if is_training and not example.is_impossible:
         # Get start and end position
@@ -136,7 +137,7 @@ def squad_convert_example_to_features(example, max_seq_length, doc_stride, max_q
             span_doc_tokens if tokenizer.padding_side == "right" else truncated_query,
             max_length=max_seq_length,
             return_overflowing_tokens=True,
-            pad_to_max_length=True,
+            pad_to_max_length=pad_to_max,
             stride=max_seq_length - doc_stride - len(truncated_query) - sequence_pair_added_tokens,
             truncation_strategy="only_second" if tokenizer.padding_side == "right" else "only_first",
             return_token_type_ids=True,
@@ -262,7 +263,8 @@ def squad_convert_example_to_features_init(tokenizer_for_convert):
 
 
 def squad_convert_examples_to_features(
-    examples, tokenizer, max_seq_length, doc_stride, max_query_length, is_training, return_dataset=False, threads=1
+    examples, tokenizer, max_seq_length, doc_stride, max_query_length, is_training,
+    pad_to_max=True, return_dataset=False, threads=1
 ):
     """
     Converts a list of examples into a list of features that can be directly given as input to a model.
@@ -309,6 +311,7 @@ def squad_convert_examples_to_features(
             doc_stride=doc_stride,
             max_query_length=max_query_length,
             is_training=is_training,
+            pad_to_max=pad_to_max
         )
         features = list(
             tqdm(

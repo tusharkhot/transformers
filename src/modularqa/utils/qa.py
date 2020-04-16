@@ -1,3 +1,4 @@
+from time import time
 from typing import List
 
 import numpy as np
@@ -40,33 +41,37 @@ def answer_question(question: str,
     """
     predicted_spans = []
     model.eval()
-
+    # start = time()
     prediction_json = {}
     if single_para:
         for i, curr_paragraph in enumerate(paragraphs):
             examples, features, dataset = get_example_features_dataset(paragraphs, question,
                                                                        tokenizer,
                                                                        length)
-
+            # print("Time to generate e,f,d: {}".format(time()-start))
+            # start = time()
             curr_para_json = get_predictions(examples=examples,
                                              features=features,
                                              dataset=dataset, model_type=model_type,
                                              tokenizer=tokenizer,
                                              device=device,
                                              model=model, num_ans_per_para=num_ans_para)
+            # print("Time to generate predictions: {}".format(time()-start))
             prediction_json[str(i)] = []
             for key, predictions in curr_para_json.items():
                 prediction_json[str(i)].extend(predictions)
     else:
         examples, features, dataset = get_example_features_dataset(paragraphs, question, tokenizer,
                                                                    length)
-
+        # print("Time to generate e,f,d: {}".format(time()-start))
+        # start = time()
         prediction_json = get_predictions(examples=examples,
                                           features=features,
                                           dataset=dataset, model_type=model_type,
                                           tokenizer=tokenizer,
                                           device=device,
                                           model=model, num_ans_per_para=num_ans_para)
+        # print("Time to generate predictions: {}".format(time()-start))
 
     for key, predictions in prediction_json.items():
         # simple 'hack' to get the paragraph
@@ -146,6 +151,7 @@ def get_example_features_dataset(paragraphs: List[str], question, tokenizer, seq
         is_training=False,
         return_dataset="pt",
         threads=4,
+        pad_to_max=False  # we will take care of padding
     )
     return examples, features, dataset
 
@@ -162,6 +168,9 @@ def get_predictions(examples, features, dataset, model_type, model, tokenizer, d
             "attention_mask": dataset[1],
             "token_type_ids": dataset[2],
         }
+        # print("*** Example ***")
+        # print("input_ids: %s" % " ".join([str(x) for x in dataset[0]]))
+        # print("input_mask: %s" % " ".join([str(x) for x in dataset[1]]))
 
         if model_type in ["xlm", "roberta", "distilbert", "camembert"]:
             del inputs["token_type_ids"]

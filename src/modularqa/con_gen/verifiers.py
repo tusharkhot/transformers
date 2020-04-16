@@ -141,7 +141,7 @@ class LMQuestionVerifier(QuestionVerifier):
         selected_questions = []
         selected_answers = []
         metadata = {"scored_questions": []}
-        for question in tqdm(questions, mininterval=5):
+        for question in questions:
             key = question + "$$" + qaconstraint.context
             if key in self.question_answers:
                 answers = self.question_answers[key]

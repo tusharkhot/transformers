@@ -46,24 +46,26 @@ def answer_question(question: str,
         for i, curr_paragraph in enumerate(paragraphs):
             examples, features, dataset = get_example_features_dataset(paragraphs, question,
                                                                        tokenizer,
-                                                                       length, device)
+                                                                       length)
 
             curr_para_json = get_predictions(examples=examples,
                                              features=features,
                                              dataset=dataset, model_type=model_type,
                                              tokenizer=tokenizer,
+                                             device=device,
                                              model=model, num_ans_per_para=num_ans_para)
             prediction_json[str(i)] = []
             for key, predictions in curr_para_json.items():
                 prediction_json[str(i)].extend(predictions)
     else:
         examples, features, dataset = get_example_features_dataset(paragraphs, question, tokenizer,
-                                                                   length, device)
+                                                                   length)
 
         prediction_json = get_predictions(examples=examples,
                                           features=features,
                                           dataset=dataset, model_type=model_type,
                                           tokenizer=tokenizer,
+                                          device=device,
                                           model=model, num_ans_per_para=num_ans_para)
 
     for key, predictions in prediction_json.items():
@@ -114,7 +116,7 @@ def answer_question(question: str,
             return [QAAnswer("", 10.0, "")]
 
 
-def get_example_features_dataset(paragraphs: List[str], question, tokenizer, seq_length, device):
+def get_example_features_dataset(paragraphs: List[str], question, tokenizer, seq_length):
     processor = SquadV2Processor()
     input_data = []
     for i, p in enumerate(paragraphs):
@@ -145,14 +147,15 @@ def get_example_features_dataset(paragraphs: List[str], question, tokenizer, seq
         return_dataset="pt",
         threads=4,
     )
-
     return examples, features, dataset
 
 
-def get_predictions(examples, features, dataset, model_type, model, tokenizer, num_ans_per_para):
+def get_predictions(examples, features, dataset, model_type, model, tokenizer, device,
+                    num_ans_per_para):
     all_results = []
     # get the list of tensors
     dataset = dataset.tensors
+    dataset = tuple(t.to(device) for t in dataset)
     with torch.no_grad():
         inputs = {
             "input_ids": dataset[0],

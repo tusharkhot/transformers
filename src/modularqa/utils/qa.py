@@ -41,37 +41,37 @@ def answer_question(question: str,
     """
     predicted_spans = []
     model.eval()
-    # start = time()
+    start = time()
     prediction_json = {}
     if single_para:
         for i, curr_paragraph in enumerate(paragraphs):
             examples, features, dataset = get_example_features_dataset(paragraphs, question,
                                                                        tokenizer,
                                                                        length)
-            # print("Time to generate e,f,d: {}".format(time()-start))
-            # start = time()
+            print("Time to generate e,f,d: {}".format(time()-start))
+            start = time()
             curr_para_json = get_predictions(examples=examples,
                                              features=features,
                                              dataset=dataset, model_type=model_type,
                                              tokenizer=tokenizer,
                                              device=device,
                                              model=model, num_ans_per_para=num_ans_para)
-            # print("Time to generate predictions: {}".format(time()-start))
+            print("Time to generate predictions: {}".format(time()-start))
             prediction_json[str(i)] = []
             for key, predictions in curr_para_json.items():
                 prediction_json[str(i)].extend(predictions)
     else:
         examples, features, dataset = get_example_features_dataset(paragraphs, question, tokenizer,
                                                                    length)
-        # print("Time to generate e,f,d: {}".format(time()-start))
-        # start = time()
+        print("Time to generate e,f,d: {}".format(time()-start))
+        start = time()
         prediction_json = get_predictions(examples=examples,
                                           features=features,
                                           dataset=dataset, model_type=model_type,
                                           tokenizer=tokenizer,
                                           device=device,
                                           model=model, num_ans_per_para=num_ans_para)
-        # print("Time to generate predictions: {}".format(time()-start))
+        print("Time to generate predictions: {}".format(time()-start))
 
     for key, predictions in prediction_json.items():
         # simple 'hack' to get the paragraph

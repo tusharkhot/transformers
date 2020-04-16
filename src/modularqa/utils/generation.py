@@ -29,7 +29,8 @@ def generate_text_sequence(model, tokenizer, model_type, prompt_text, device,
         top_p=top_p,
         do_sample=True,
         num_return_sequences=num_samples,
-        decoder_start_token_id=tokenizer.bos_token_id
+        decoder_start_token_id=model.config.bos_token_id,
+        pad_token_id=model.config.pad_token_id or model.config.eos_token_id
     )
 
     # Remove the batch dimension when returning multiple sequences

@@ -48,7 +48,6 @@ def generate_text_sequence(model, tokenizer, model_type, prompt_text, device,
             generated_sequence = generated_sequence[len(encoded_prompt[0]):]
         # Decode text
         text = tokenizer.decode(generated_sequence, clean_up_tokenization_spaces=True)
-        print(text)
         # Remove all text after the stop token
         if stop_token is None:
             stop_token = tokenizer.eos_token

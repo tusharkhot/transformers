@@ -86,7 +86,6 @@ def answer_question(question: str,
     if len(predicted_spans):
         answer_list = [QAAnswer(text, prob, para)
                        for text, prob, para in sorted(predicted_spans, key=lambda x: -x[1])]
-
         ## returns text (even if empty) and -log prob
         if normalize:
             # should have probability 1, there -log prob(1)  = 0
@@ -141,7 +140,6 @@ def get_example_features_dataset(paragraphs: List[str], question, tokenizer, seq
             ]
         })
     examples = processor._create_examples(input_data, "dev")
-
     features, dataset = squad_convert_examples_to_features(
         examples=examples,
         tokenizer=tokenizer,
@@ -150,7 +148,7 @@ def get_example_features_dataset(paragraphs: List[str], question, tokenizer, seq
         max_query_length=512,
         is_training=False,
         return_dataset="pt",
-        threads=4,
+        threads=1,
         pad_to_max=False  # we will take care of padding
     )
     return examples, features, dataset

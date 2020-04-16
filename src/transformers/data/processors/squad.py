@@ -303,24 +303,34 @@ def squad_convert_examples_to_features(
 
     # Defining helper methods
     features = []
-    threads = min(threads, cpu_count())
-    with Pool(threads, initializer=squad_convert_example_to_features_init, initargs=(tokenizer,)) as p:
-        annotate_ = partial(
-            squad_convert_example_to_features,
-            max_seq_length=max_seq_length,
-            doc_stride=doc_stride,
-            max_query_length=max_query_length,
-            is_training=is_training,
-            pad_to_max=pad_to_max
-        )
-        features = list(
-            tqdm(
-                p.imap(annotate_, examples, chunksize=32),
-                total=len(examples),
-                desc="convert squad examples to features",
-                disable=(len(examples) < 20)
+    if len(examples) < 10:
+        squad_convert_example_to_features_init(tokenizer)
+        for example in examples:
+            features.append(squad_convert_example_to_features(example,
+                                                              max_seq_length=max_seq_length,
+                                                              doc_stride=doc_stride,
+                                                              max_query_length=max_query_length,
+                                                              is_training=is_training,
+                                                              pad_to_max=pad_to_max))
+    else:
+        threads = min(threads, cpu_count())
+        with Pool(threads, initializer=squad_convert_example_to_features_init, initargs=(tokenizer,)) as p:
+            annotate_ = partial(
+                squad_convert_example_to_features,
+                max_seq_length=max_seq_length,
+                doc_stride=doc_stride,
+                max_query_length=max_query_length,
+                is_training=is_training,
+                pad_to_max=pad_to_max
             )
-        )
+            features = list(
+                tqdm(
+                    p.imap(annotate_, examples, chunksize=32),
+                    total=len(examples),
+                    desc="convert squad examples to features",
+                    disable=(len(examples) < 20)
+                )
+            )
     new_features = []
     unique_id = 1000000000
     example_index = 0

@@ -133,7 +133,7 @@ class LMQuestionGenerator(QuestionGenerator):
                                                  temperature=self.temperature,
                                                  top_k=self.top_k, top_p=self.top_p,
                                                  tokenizer=self.tokenizer, device=self.device)
-
+            output_seqs = list(set(output_seqs))
             metadata = {
                 "generated_questions": output_seqs
             }

@@ -303,7 +303,9 @@ def squad_convert_examples_to_features(
 
     # Defining helper methods
     features = []
-    if len(examples) < 10:
+    threads = min(threads, cpu_count())
+    if threads == 1:
+        # Avoid overhead if single-thread
         squad_convert_example_to_features_init(tokenizer)
         for example in examples:
             features.append(squad_convert_example_to_features(example,
@@ -313,7 +315,6 @@ def squad_convert_examples_to_features(
                                                               is_training=is_training,
                                                               pad_to_max=pad_to_max))
     else:
-        threads = min(threads, cpu_count())
         with Pool(threads, initializer=squad_convert_example_to_features_init, initargs=(tokenizer,)) as p:
             annotate_ = partial(
                 squad_convert_example_to_features,

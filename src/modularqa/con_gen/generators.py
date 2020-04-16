@@ -1,4 +1,7 @@
 import itertools
+import math
+import random
+from collections import Counter
 from copy import deepcopy
 from typing import Tuple, List, Dict, Any
 
@@ -96,6 +99,7 @@ class LMQuestionGenerator(QuestionGenerator):
                  top_p=0.9,
                  top_k=0,
                  temperature=1.0,
+                 sample_hints_groups=1,
                  format="c_h_a_q"):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -109,6 +113,7 @@ class LMQuestionGenerator(QuestionGenerator):
         self.top_k = top_k
         self.format = format
         self.temperature = temperature
+        self.sample_hints_groups = sample_hints_groups
         self.cached_questions = {}
 
     def reset_question_caches(self):
@@ -118,22 +123,48 @@ class LMQuestionGenerator(QuestionGenerator):
                            previous_questions: List[str] = None,
                            previous_answers: List[str] = None) -> Tuple[List[str], Dict[Any, Any]]:
         if self.format == "c_h_a_q":
-            new_hints = qaconstraint.qconstraint.hints
-            sequence = qaconstraint.context + HINT_MARKER + \
-                       HINTS_DELIM.join(new_hints)
-            if qaconstraint.aconstraint.exp_ans is not None:
-                sequence += ANSWER_MARKER + qaconstraint.aconstraint.exp_ans
-            sequence += QUESTION_MARKER
-            if sequence in self.cached_questions:
-                return self.cached_questions[sequence]
-            output_seqs = generate_text_sequence(model=self.model, prompt_text=sequence,
-                                                 model_type=self.model_type,
-                                                 length=self.length,
-                                                 num_samples=self.num_samples,
-                                                 temperature=self.temperature,
-                                                 top_k=self.top_k, top_p=self.top_p,
-                                                 tokenizer=self.tokenizer, device=self.device)
-            output_seqs = list(set(output_seqs))
+            output_seqs = []
+            for g in range(self.sample_hints_groups):
+                # only sample after the first group
+                if g > 0:
+                    hint_counter = Counter()
+                    hints = qaconstraint.qconstraint.hints
+                    for hintidx, hint in enumerate(hints):
+                        hint_counter[hintidx] = 0
+                        for seq in output_seqs:
+                            if hint in seq:
+                                hint_counter.update([hintidx])
+                    distribution = [0] * len(hints)
+                    for hidx, c in hint_counter.items():
+                        distribution[hidx] = math.exp(-c)
+                    # print(hints)
+                    # print(distribution)
+                    new_hints = random.choices(hints, weights=distribution, k=len(hints))
+                    new_hints = list(set(new_hints))
+                    # print("Sampled hints: {} from {}".format(new_hints, hints))
+                else:
+                    new_hints = list(set(qaconstraint.qconstraint.hints))
+                sequence = qaconstraint.context + HINT_MARKER + \
+                           HINTS_DELIM.join(new_hints)
+                if qaconstraint.aconstraint.exp_ans is not None:
+                    sequence += ANSWER_MARKER + qaconstraint.aconstraint.exp_ans
+                sequence += QUESTION_MARKER
+                if sequence in self.cached_questions and g == 0:
+                    return self.cached_questions[sequence]
+
+                num_samples = math.ceil(self.num_samples/self.sample_hints_groups)
+
+                outputs = generate_text_sequence(model=self.model, prompt_text=sequence,
+                                                     model_type=self.model_type,
+                                                     length=self.length,
+                                                     num_samples=num_samples,
+                                                     temperature=self.temperature,
+                                                     top_k=self.top_k, top_p=self.top_p,
+                                                     tokenizer=self.tokenizer, device=self.device)
+                # print("\n".join(outputs))
+                output_seqs.extend(outputs)
+                output_seqs = list(set(output_seqs))
+
             metadata = {
                 "generated_questions": output_seqs
             }

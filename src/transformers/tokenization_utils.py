@@ -1225,7 +1225,7 @@ class PreTrainedTokenizer(SpecialTokensMixin):
                 return text
             else:
                 raise ValueError(
-                    "Input is not valid. Should be a string, a list/tuple of strings or a list/tuple of integers."
+                    "Input is not valid. Should be a string, a list/tuple of strings or a list/tuple of integers. {}".format(text)
                 )
 
         if return_offsets_mapping:

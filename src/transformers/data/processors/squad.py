@@ -179,6 +179,8 @@ def squad_convert_example_to_features(example, max_seq_length, doc_stride, max_q
 
         if "overflowing_tokens" not in encoded_dict:
             break
+        else:
+            pad_to_max=True
         span_doc_tokens = encoded_dict["overflowing_tokens"]
 
     for doc_span_index in range(len(spans)):

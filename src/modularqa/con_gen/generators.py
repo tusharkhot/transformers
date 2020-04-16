@@ -124,9 +124,11 @@ class LMQuestionGenerator(QuestionGenerator):
                            previous_answers: List[str] = None) -> Tuple[List[str], Dict[Any, Any]]:
         if self.format == "c_h_a_q":
             output_seqs = []
+            # sub-sample hints based on previously generated questions
             for g in range(self.sample_hints_groups):
                 # only sample after the first group
                 if g > 0:
+                    # count the number of occurences of hints. TODO Stemming?
                     hint_counter = Counter()
                     hints = qaconstraint.qconstraint.hints
                     for hintidx, hint in enumerate(hints):
@@ -134,16 +136,16 @@ class LMQuestionGenerator(QuestionGenerator):
                         for seq in output_seqs:
                             if hint in seq:
                                 hint_counter.update([hintidx])
+                    # get exp distribution from the counts
                     distribution = [0] * len(hints)
                     for hidx, c in hint_counter.items():
                         distribution[hidx] = math.exp(-c)
-                    # print(hints)
-                    # print(distribution)
+                    # sample based on this distribution
                     new_hints = random.choices(hints, weights=distribution, k=len(hints))
                     new_hints = list(set(new_hints))
-                    # print("Sampled hints: {} from {}".format(new_hints, hints))
                 else:
                     new_hints = list(set(qaconstraint.qconstraint.hints))
+
                 sequence = qaconstraint.context + HINT_MARKER + \
                            HINTS_DELIM.join(new_hints)
                 if qaconstraint.aconstraint.exp_ans is not None:
@@ -162,7 +164,7 @@ class LMQuestionGenerator(QuestionGenerator):
                                                      top_k=self.top_k, top_p=self.top_p,
                                                      tokenizer=self.tokenizer, device=self.device)
                 # print("\n".join(outputs))
-                output_seqs.extend(outputs)
+                output_seqs.extend([o for o in outputs if len(o)])
                 output_seqs = list(set(output_seqs))
 
             metadata = {

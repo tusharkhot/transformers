@@ -40,18 +40,20 @@ RUN apt-get update --fix-missing && apt-get install -y \
 RUN python3 -m pip install nltk
 RUN python3 -m nltk.downloader stopwords
 RUN python3 -m nltk.downloader punkt
+RUN python3 -m pip install --no-cache-dir \
+    mkl \
+    torch \
+    tensorboard
 
 
 COPY README.md .
 COPY setup.py .
 COPY transformers-cli .
-COPY src/ src/
-COPY examples/ examples/
+COPY src/transformers src/transformers
 RUN python3 -m pip install --no-cache-dir .
-RUN python3 -m pip install --no-cache-dir \
-    mkl \
-    torch \
-    tensorboard
+COPY src/modularqa src/modularqa
+COPY examples/ examples/
+
 
 
 

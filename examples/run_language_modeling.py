@@ -104,10 +104,12 @@ class ConditionalTextDataset(Dataset):
                 self._truncate_seq_pair(tokenized_lhs, tokenized_rhs,
                                         max_length=block_size - 1)
                 attention_mask = [1] * len(tokenized_lhs)
+                eos_token = tokenizer.eos_token_id or tokenizer.pad_token_id
+                bos_token = tokenizer.bos_token_id or tokenizer.pad_token_id
                 self.examples.append((tokenized_lhs,  # input
-                                     tokenized_rhs + tokenizer.convert_tokens_to_ids([tokenizer.eos_token]), #labels
+                                     tokenized_rhs + [eos_token], #labels
                                      attention_mask,  # mask
-                                     tokenizer.convert_tokens_to_ids([tokenizer.eos_token]) + tokenized_rhs # decoder
+                                     [bos_token] + tokenized_rhs # decoder
                                      ))
                 if len(self.examples) < 5:
                     print(lhs_str)
@@ -116,6 +118,7 @@ class ConditionalTextDataset(Dataset):
                     print(self.examples[-1][1])
                     print(self.examples[-1][3])
             logger.info("Saving features into cached file %s", cached_features_file)
+            os.makedirs(os.path.dirname(cached_features_file), exist_ok=True)
             with open(cached_features_file, "wb") as handle:
                 pickle.dump(self.examples, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
@@ -298,8 +301,8 @@ def train(args, train_dataset, model: PreTrainedModel, tokenizer: PreTrainedToke
         tb_writer = SummaryWriter()
 
     args.train_batch_size = args.per_gpu_train_batch_size * max(1, args.n_gpu)
-    train_dataloader = create_dataloader(args, train_dataset, tokenizer, args.train_batch_size,
-                                         for_train=True)
+    train_dataloader, train_sampler = create_dataloader(args, train_dataset, tokenizer, args.train_batch_size,
+                                                        for_train=True)
 
     if args.max_steps > 0:
         t_total = args.max_steps
@@ -416,8 +419,9 @@ def train(args, train_dataset, model: PreTrainedModel, tokenizer: PreTrainedToke
             mask = mask.to(args.device) if mask is not None else None
             decoder_input = decoder_input.to(args.device) if decoder_input is not None else None
             model.train()
-            outputs = model(inputs, masked_lm_labels=labels) if args.mlm else \
-                model(inputs, labels=labels, attention_mask=mask, decoder_input_ids=decoder_input)
+
+            outputs = get_model_outputs(args=args, model=model, inputs=inputs, labels=labels,
+                                        mask=mask, decoder_input=decoder_input)
             loss = outputs[0]  # model outputs are always tuple in transformers (see doc)
             if args.n_gpu > 1:
                 loss = loss.mean()  # mean() to average on multi-gpu parallel training
@@ -511,6 +515,20 @@ def get_input_labels(batch, tokenizer, args):
     return inputs, labels, mask, decoder_input
 
 
+def get_model_outputs(args, model, inputs, labels, mask, decoder_input):
+    if args.mlm:
+        outputs = model(inputs, masked_lm_labels=labels)
+    elif model.config.is_encoder_decoder:
+        outputs = model(inputs, labels=labels, attention_mask=mask, decoder_input_ids=decoder_input)
+    else:
+        # take the inputs + decoder inputs except the first <bos> token
+        new_inputs = torch.cat([inputs, decoder_input[:, 1:, ]], dim=1)
+        # ignore labels + gold labels except the last mask token
+        new_labels = torch.cat([-100 * torch.ones(inputs.shape, dtype=torch.long),
+                                labels[:, :-1]], dim=1)
+        outputs = model(input_ids=new_inputs, labels=new_labels)
+    return outputs
+
 def create_dataloader(args, dataset, tokenizer, batch_size, for_train):
 
     def collate(input: List[torch.Tensor]):
@@ -544,14 +562,14 @@ def create_dataloader(args, dataset, tokenizer, batch_size, for_train):
         train_dataloader = DataLoader(
             dataset, sampler=train_sampler, batch_size=batch_size, collate_fn=collate
         )
-        return train_dataloader
+        return train_dataloader, train_sampler
     else:
         # Note that DistributedSampler samples randomly
         eval_sampler = SequentialSampler(dataset)
         eval_dataloader = DataLoader(
             dataset, sampler=eval_sampler, batch_size=batch_size, collate_fn=collate
         )
-        return eval_dataloader
+        return eval_dataloader, eval_sampler
 
 
 def evaluate(args, model: PreTrainedModel, tokenizer: PreTrainedTokenizer, prefix="") -> Dict:
@@ -564,8 +582,8 @@ def evaluate(args, model: PreTrainedModel, tokenizer: PreTrainedTokenizer, prefi
         os.makedirs(eval_output_dir, exist_ok=True)
 
     args.eval_batch_size = args.per_gpu_eval_batch_size * max(1, args.n_gpu)
-    eval_dataloader = create_dataloader(args, eval_dataset, tokenizer, args.eval_batch_size,
-                                         for_train=False)
+    eval_dataloader, eval_sampler = create_dataloader(args, eval_dataset, tokenizer,
+                                                      args.eval_batch_size, for_train=False)
 
     # multi-gpu evaluate
     if args.n_gpu > 1:
@@ -586,8 +604,8 @@ def evaluate(args, model: PreTrainedModel, tokenizer: PreTrainedTokenizer, prefi
         mask = mask.to(args.device) if mask is not None else None
         decoder_input = decoder_input.to(args.device) if decoder_input is not None else None
         with torch.no_grad():
-            outputs = model(inputs, masked_lm_labels=labels) if args.mlm else \
-                model(inputs, labels=labels, attention_mask=mask, decoder_input_ids=decoder_input)
+            outputs = get_model_outputs(args=args, model=model, inputs=inputs, labels=labels,
+                                        mask=mask, decoder_input=decoder_input)
             lm_loss = outputs[0]
             eval_loss += lm_loss.mean().item()
         nb_eval_steps += 1

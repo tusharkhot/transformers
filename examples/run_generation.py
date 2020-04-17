@@ -260,7 +260,7 @@ def main():
             repetition_penalty=args.repetition_penalty,
             do_sample=True,
             num_return_sequences=args.num_return_sequences,
-            decoder_start_token_id=tokenizer.eos_token_id
+            decoder_start_token_id=model.config.decoder_start_token_id or tokenizer.bos_token_id or tokenizer.pad_token_id
         )
 
         # Remove the batch dimension when returning multiple sequences

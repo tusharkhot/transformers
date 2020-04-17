@@ -104,8 +104,9 @@ class ConditionalTextDataset(Dataset):
                 self._truncate_seq_pair(tokenized_lhs, tokenized_rhs,
                                         max_length=block_size - 1)
                 attention_mask = [1] * len(tokenized_lhs)
-                eos_token = tokenizer.eos_token_id or tokenizer.pad_token_id
-                bos_token = tokenizer.bos_token_id or tokenizer.pad_token_id
+                # DONT use padding token. Internal code uses that for masking
+                eos_token = tokenizer.eos_token_id or tokenizer.bos_token_id
+                bos_token = tokenizer.bos_token_id or tokenizer.eos_token_id
                 self.examples.append((tokenized_lhs,  # input
                                      tokenized_rhs + [eos_token], #labels
                                      attention_mask,  # mask
@@ -298,7 +299,7 @@ def mask_tokens(inputs: torch.Tensor, tokenizer: PreTrainedTokenizer, args) -> T
 def train(args, train_dataset, model: PreTrainedModel, tokenizer: PreTrainedTokenizer) -> Tuple[int, float]:
     """ Train the model """
     if args.local_rank in [-1, 0]:
-        tb_writer = SummaryWriter()
+        tb_writer = SummaryWriter(log_dir=args.output_dir)
 
     args.train_batch_size = args.per_gpu_train_batch_size * max(1, args.n_gpu)
     train_dataloader, train_sampler = create_dataloader(args, train_dataset, tokenizer, args.train_batch_size,
@@ -613,7 +614,7 @@ def evaluate(args, model: PreTrainedModel, tokenizer: PreTrainedTokenizer, prefi
     eval_loss = eval_loss / nb_eval_steps
     perplexity = torch.exp(torch.tensor(eval_loss))
 
-    result = {"perplexity": perplexity}
+    result = {"perplexity": perplexity.item()}
 
     output_eval_file = os.path.join(eval_output_dir, prefix, "eval_results.txt")
     with open(output_eval_file, "w") as writer:

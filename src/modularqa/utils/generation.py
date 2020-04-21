@@ -1,9 +1,76 @@
+import torch
+
+from transformers import AutoConfig, AutoTokenizer, AutoModelWithLMHead
+
 PREPROCESSING_FUNCTIONS = {
     "ctrl": None,
     "xlm": None,
     "xlnet": None,
     "transfo-xl": None,
 }
+
+
+class LMGenerator():
+    path_to_modeltokenizer = {}
+
+    def __init__(self,
+                 model_path,
+                 model_type=None,
+                 length=30,
+                 num_samples=20,
+                 top_p=0.9,
+                 top_k=0,
+                 temperature=1.0):
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+        ## set up the model
+        self.model, self.tokenizer = LMGenerator.load_model_tokenizer(model_path)
+        self.model_type = model_type if model_type is not None else self.model.config.model_type
+        self.model.eval()
+        self.length = length
+        self.num_samples = num_samples
+        self.top_p = top_p
+        self.top_k = top_k
+        self.temperature = temperature
+
+    def generate_sequences(self, sequence, num_samples=None):
+        if num_samples is None:
+            num_samples = self.num_samples
+        outputs = generate_text_sequence(model=self.model, prompt_text=sequence,
+                                         model_type=self.model_type,
+                                         length=self.length,
+                                         num_samples=num_samples,
+                                         temperature=self.temperature,
+                                         top_k=self.top_k, top_p=self.top_p,
+                                         tokenizer=self.tokenizer, device=self.device)
+
+        return outputs
+
+    @staticmethod
+    def load_model_tokenizer(model_path):
+        if model_path in LMGenerator.path_to_modeltokenizer:
+            return LMGenerator.path_to_modeltokenizer[model_path]
+        else:
+            config = AutoConfig.from_pretrained(
+                model_path,
+                cache_dir=None,
+            )
+            tokenizer = AutoTokenizer.from_pretrained(
+                model_path,
+                do_lower_case=False,
+                cache_dir=None,
+            )
+            print("Loading {} model from: {}".format(config.model_type, model_path))
+            model = AutoModelWithLMHead.from_pretrained(
+                model_path,
+                from_tf=False,
+                config=config,
+                cache_dir=None,
+            )
+            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            model.to(device)
+            LMGenerator.path_to_modeltokenizer[model_path] = (model, tokenizer)
+            return model, tokenizer
 
 
 def generate_text_sequence(model, tokenizer, model_type, prompt_text, device,

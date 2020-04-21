@@ -1,0 +1,27 @@
+{
+  "start_state": "gen",
+  "end_state": "EOQ",
+  "models": {
+    "gen": {
+      "name": "lmgen",
+      "model_path": "../launchpadqa/data/hotpot_beaker/hotpotqa_bridge_hard_n20_n0.5_m0.5_a0.2/gpt2_small_3e_1e-5_b32_ckpt6000/",
+      "length": 30,
+      "num_samples": 20
+    },
+    "qa": {
+      "name": "model_router"
+    },
+    "squad": {
+      "name": "lmqa",
+      "model_type": "bert",
+      "model_path": "../launchpadqa/data/squad/bert_output/",
+      "single_para": true,
+      "hotpotqa_file": "../launchpadqa/data/hotpotqa/hotpot_dev_distractor_v1.json",
+      "num_ans_para": 1
+    },
+    "qal":  {
+      "name": "qual_bert",
+      "model_path": "../launchpadqa/data/hotpot_beaker/hotpot_n0to4_9_bert_lc_wm_5e_1e-5_b32_ckpt24000/"
+    }
+  }
+}

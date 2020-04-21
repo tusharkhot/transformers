@@ -12,6 +12,7 @@ spacy_nlp = None
 
 parse_cache = {}
 
+WH_WORDS = ["who", "what", "where", "how", "why", "when", "which"]
 
 def tokenize_str(input_str):
     return word_tokenize(input_str)
@@ -27,6 +28,12 @@ def filter_stop_tokens(token_arr):
 
 def default_filter_tokenization(input_str):
     return stem_tokens(filter_stop_tokens(tokenize_str(input_str.lower())))
+
+
+def tokenize_question(question):
+    # drop wh-words
+    qtokens = default_filter_tokenization(question)
+    return [q for q in qtokens if q.lower() not in WH_WORDS]
 
 
 def asymm_overlap_score(sub_tokens, super_tokens):

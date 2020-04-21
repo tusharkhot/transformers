@@ -10,7 +10,7 @@ import torch
 from modularqa.con_gen.constraints import QAConstraint
 from modularqa.drop.drop_utils import get_number
 from modularqa.con_gen.constants import HINT_MARKER, HINTS_DELIM, ANSWER_MARKER, QUESTION_MARKER
-from modularqa.utils.generation import generate_text_sequence
+from modularqa.utils.generation import generate_text_sequence, LMGenerator
 from transformers import AutoConfig, AutoTokenizer, AutoModelWithLMHead
 
 
@@ -40,31 +40,31 @@ class QuestionGenerator:
             return DummyGenerator.load_from_json(input_json)
         raise ValueError("Unknown generator type: " + input_json["type"])
 
-    @staticmethod
-    def load_model_tokenizer(model_path):
-        if model_path in QuestionGenerator.path_to_modeltokenizer:
-            return QuestionGenerator.path_to_modeltokenizer[model_path]
-        else:
-            config = AutoConfig.from_pretrained(
-                model_path,
-                cache_dir=None,
-            )
-            tokenizer = AutoTokenizer.from_pretrained(
-                model_path,
-                do_lower_case=False,
-                cache_dir=None,
-            )
-            print("Loading {} model from: {}".format(config.model_type, model_path))
-            model = AutoModelWithLMHead.from_pretrained(
-                model_path,
-                from_tf=False,
-                config=config,
-                cache_dir=None,
-            )
-            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-            model.to(device)
-            QuestionGenerator.path_to_modeltokenizer[model_path] = (model, tokenizer)
-            return model, tokenizer
+    # @staticmethod
+    # def load_model_tokenizer(model_path):
+    #     if model_path in QuestionGenerator.path_to_modeltokenizer:
+    #         return QuestionGenerator.path_to_modeltokenizer[model_path]
+    #     else:
+    #         config = AutoConfig.from_pretrained(
+    #             model_path,
+    #             cache_dir=None,
+    #         )
+    #         tokenizer = AutoTokenizer.from_pretrained(
+    #             model_path,
+    #             do_lower_case=False,
+    #             cache_dir=None,
+    #         )
+    #         print("Loading {} model from: {}".format(config.model_type, model_path))
+    #         model = AutoModelWithLMHead.from_pretrained(
+    #             model_path,
+    #             from_tf=False,
+    #             config=config,
+    #             cache_dir=None,
+    #         )
+    #         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    #         model.to(device)
+    #         QuestionGenerator.path_to_modeltokenizer[model_path] = (model, tokenizer)
+    #         return model, tokenizer
 
     def reset_question_caches(self):
         pass
@@ -90,31 +90,37 @@ class DummyGenerator(QuestionGenerator):
 
 
 class LMQuestionGenerator(QuestionGenerator):
+    #
+    # def __init__(self,
+    #              model_path,
+    #              model_type=None,
+    #              length=30,
+    #              num_samples=20,
+    #              top_p=0.9,
+    #              top_k=0,
+    #              temperature=1.0,
+    #              sample_hints_groups=1,
+    #              format="c_h_a_q"):
+    #     self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    #
+    #     ## set up the model
+    #     self.model, self.tokenizer = QuestionGenerator.load_model_tokenizer(model_path)
+    #     self.model_type = model_type if model_type is not None else self.model.config.model_type
+    #     self.model.eval()
+    #     self.length = length
+    #     self.num_samples = num_samples
+    #     self.top_p = top_p
+    #     self.top_k = top_k
+    #     self.format = format
+    #     self.temperature = temperature
+    #     self.sample_hints_groups = sample_hints_groups
+    #     self.cached_questions = {}
 
-    def __init__(self,
-                 model_path,
-                 model_type=None,
-                 length=30,
-                 num_samples=20,
-                 top_p=0.9,
-                 top_k=0,
-                 temperature=1.0,
-                 sample_hints_groups=1,
-                 format="c_h_a_q"):
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-        ## set up the model
-        self.model, self.tokenizer = QuestionGenerator.load_model_tokenizer(model_path)
-        self.model_type = model_type if model_type is not None else self.model.config.model_type
-        self.model.eval()
-        self.length = length
-        self.num_samples = num_samples
-        self.top_p = top_p
-        self.top_k = top_k
-        self.format = format
-        self.temperature = temperature
+    def __init__(self, sample_hints_groups, format="c_h_a_q", **kwargs):
         self.sample_hints_groups = sample_hints_groups
         self.cached_questions = {}
+        self.format = format
+        self.qgen_model = LMGenerator(**kwargs)
 
     def reset_question_caches(self):
         self.cached_questions.clear()
@@ -153,17 +159,8 @@ class LMQuestionGenerator(QuestionGenerator):
                 sequence += QUESTION_MARKER
                 if sequence in self.cached_questions and g == 0:
                     return self.cached_questions[sequence]
-
-                num_samples = math.ceil(self.num_samples/self.sample_hints_groups)
-
-                outputs = generate_text_sequence(model=self.model, prompt_text=sequence,
-                                                     model_type=self.model_type,
-                                                     length=self.length,
-                                                     num_samples=num_samples,
-                                                     temperature=self.temperature,
-                                                     top_k=self.top_k, top_p=self.top_p,
-                                                     tokenizer=self.tokenizer, device=self.device)
-                # print("\n".join(outputs))
+                num_samples = math.ceil(self.qgen_model.num_samples/self.sample_hints_groups)
+                outputs = self.qgen_model.generate_sequences(sequence, num_samples)
                 output_seqs.extend([o for o in outputs if len(o)])
                 output_seqs = list(set(output_seqs))
 

@@ -1,10 +1,12 @@
-from time import time
+import json
 from typing import List
 
 import numpy as np
 import torch
 
 from examples.run_squad import to_list
+from modularqa.con_gen.constants import TITLE_DELIM
+from transformers import AutoConfig, AutoTokenizer, AutoModelForQuestionAnswering
 from transformers import SquadV2Processor, squad_convert_examples_to_features
 from transformers.data.metrics.squad_metrics import compute_predictions_log_probs, \
     compute_predictions_logits
@@ -20,6 +22,111 @@ class QAAnswer(object):
 
     def __str__(self):
         return "Ans:{} Score:{} Para:{}".format(self.answer, self.score, self.para_text)
+
+
+class LMQuestionAnswerer:
+    path_to_modeltokenizer = {}
+
+    def __init__(self, model_path, model_type=None,
+                 hotpotqa_file=None, drop_file=None, only_gold_para=False,
+                 seq_length=512, num_ans_para=1, single_para=False):
+        self.model, self.tokenizer = LMQuestionAnswerer.load_model_tokenizer(model_path)
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.seq_length = seq_length
+        self.num_ans_para = num_ans_para
+        self.model_type = model_type if model_type is not None else self.model.config.model_type
+        self.single_para = single_para
+        # if para_file is passed, load the documents from this file
+        if hotpotqa_file is not None:
+            self._qid_doc_map = self.get_qid_doc_map_hotpotqa(hotpotqa_file, only_gold_para)
+        elif drop_file is not None:
+            self._qid_doc_map = self.get_qid_doc_map_drop(drop_file)
+        else:
+            self._qid_doc_map = None
+
+    @staticmethod
+    def load_model_tokenizer(model_path):
+        if model_path in LMQuestionAnswerer.path_to_modeltokenizer:
+            return LMQuestionAnswerer.path_to_modeltokenizer[model_path]
+        else:
+            config = AutoConfig.from_pretrained(
+                model_path,
+                cache_dir=None,
+            )
+            tokenizer = AutoTokenizer.from_pretrained(
+                model_path,
+                do_lower_case=False,
+                cache_dir=None,
+            )
+            print("Loading {} model from: {}".format(config.model_type, model_path))
+            model = AutoModelForQuestionAnswering.from_pretrained(
+                model_path,
+                from_tf=False,
+                config=config,
+                cache_dir=None,
+            )
+            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            model.to(device)
+            LMQuestionAnswerer.path_to_modeltokenizer[model_path] = (model, tokenizer)
+            return model, tokenizer
+
+    def answer_question(self, question: str, paragraphs: List[str], normalize=False):
+        return answer_question(question=question, model=self.model,
+                               model_type=self.model_type,
+                               paragraphs=paragraphs,
+                               tokenizer=self.tokenizer,
+                               device=self.device, length=self.seq_length,
+                               num_ans_para=self.num_ans_para,
+                               normalize=normalize,
+                               single_para=self.single_para)
+
+
+    def answer_question_only(self, question: str, qid: str, normalize=False):
+        """
+        Answer question using title+paras for the question corresponding to this QID
+        :param question: input question
+        :param qid: question id
+        :return: answer
+        """
+        if self._qid_doc_map is None:
+            raise ValueError("QA model should be constructed with an input HotPotQA/DROP file"
+                             " to load qid -> doc map")
+        else:
+            if qid not in self._qid_doc_map:
+                raise ValueError("QID: {} not found in the qid->doc map loaded.".format(qid))
+            else:
+                doc_map = self._qid_doc_map[qid]
+                paragraphs = [t + TITLE_DELIM + " ".join(doc) for (t, doc) in doc_map.items()]
+                return self.answer_question(question, paragraphs, normalize=normalize)
+
+    def get_qid_doc_map_hotpotqa(self, para_file, only_gold_para):
+        with open(para_file, "r") as input_fp:
+            input_json = json.load(input_fp)
+        qid_doc_map = {}
+        for entry in input_json:
+            supporting_docs = {doc for (doc, idx) in entry["supporting_facts"]}
+            title_doc_map = {}
+            qid = entry["_id"]
+            for title, document in entry["context"]:
+                if not only_gold_para or title in supporting_docs:
+                    title_doc_map[title] = [doc.strip() for doc in document]
+
+            qid_doc_map[qid] = title_doc_map
+
+        return qid_doc_map
+
+    def get_qid_doc_map_drop(self, drop_file):
+        with open(drop_file, "r") as input_fp:
+            input_json = json.load(input_fp)
+        qid_doc_map = {}
+        for paraid, item in input_json.items():
+            para = item["passage"]
+            title_doc_map = {paraid: [para]}
+            for qa_pair in item["qa_pairs"]:
+                qid = qa_pair["query_id"]
+                qid_doc_map[qid] = title_doc_map
+
+        return qid_doc_map
 
 
 def answer_question(question: str,
@@ -45,9 +152,11 @@ def answer_question(question: str,
     prediction_json = {}
     if single_para:
         for i, curr_paragraph in enumerate(paragraphs):
-            examples, features, dataset = get_example_features_dataset(paragraphs, question,
+            examples, features, dataset = get_example_features_dataset([curr_paragraph], question,
                                                                        tokenizer,
                                                                        length)
+            if len(examples) > 1:
+                print("More than one example from single para + question")
             # print("Time to generate e,f,d: {}".format(time()-start))
             # start = time()
             curr_para_json = get_predictions(examples=examples,
@@ -57,6 +166,7 @@ def answer_question(question: str,
                                              device=device,
                                              model=model, num_ans_per_para=num_ans_para)
             # print("Time to generate predictions: {}".format(time()-start))
+
             prediction_json[str(i)] = []
             for key, predictions in curr_para_json.items():
                 prediction_json[str(i)].extend(predictions)

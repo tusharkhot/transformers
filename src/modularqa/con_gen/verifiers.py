@@ -7,7 +7,7 @@ from modularqa.con_gen.constants import LIST_JOINER
 from modularqa.con_gen.constraints import QAConstraint
 from modularqa.drop.drop_utils import get_number, number_match
 from modularqa.utils.math_qa import MathQA
-from modularqa.utils.qa import answer_question
+from modularqa.utils.qa import answer_question, LMQuestionAnswerer
 from modularqa.utils.str_utils import tokenize_str, overlap_score
 from transformers import AutoConfig, AutoTokenizer, AutoModelForQuestionAnswering
 
@@ -45,31 +45,31 @@ class QuestionVerifier:
             return DummyVerifier.load_from_json(input_json)
         raise ValueError("Unknown verifier type: " + input_json["type"])
 
-    @staticmethod
-    def load_model_tokenizer(model_path):
-        if model_path in QuestionVerifier.path_to_modeltokenizer:
-            return QuestionVerifier.path_to_modeltokenizer[model_path]
-        else:
-            config = AutoConfig.from_pretrained(
-                model_path,
-                cache_dir=None,
-            )
-            tokenizer = AutoTokenizer.from_pretrained(
-                model_path,
-                do_lower_case=False,
-                cache_dir=None,
-            )
-            print("Loading {} model from: {}".format(config.model_type, model_path))
-            model = AutoModelForQuestionAnswering.from_pretrained(
-                model_path,
-                from_tf=False,
-                config=config,
-                cache_dir=None,
-            )
-            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-            model.to(device)
-            QuestionVerifier.path_to_modeltokenizer[model_path] = (model, tokenizer)
-            return model, tokenizer
+    # @staticmethod
+    # def load_model_tokenizer(model_path):
+    #     if model_path in QuestionVerifier.path_to_modeltokenizer:
+    #         return QuestionVerifier.path_to_modeltokenizer[model_path]
+    #     else:
+    #         config = AutoConfig.from_pretrained(
+    #             model_path,
+    #             cache_dir=None,
+    #         )
+    #         tokenizer = AutoTokenizer.from_pretrained(
+    #             model_path,
+    #             do_lower_case=False,
+    #             cache_dir=None,
+    #         )
+    #         print("Loading {} model from: {}".format(config.model_type, model_path))
+    #         model = AutoModelForQuestionAnswering.from_pretrained(
+    #             model_path,
+    #             from_tf=False,
+    #             config=config,
+    #             cache_dir=None,
+    #         )
+    #         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    #         model.to(device)
+    #         QuestionVerifier.path_to_modeltokenizer[model_path] = (model, tokenizer)
+    #         return model, tokenizer
 
     def reset_question_caches(self):
         pass
@@ -101,15 +101,18 @@ class DummyVerifier(QuestionVerifier):
 
 class LMQuestionVerifier(QuestionVerifier):
 
-    def __init__(self, model_path, model_type=None, seq_length=512, num_ans_para=1,
-                 single_para=False):
-        self.model, self.tokenizer = QuestionVerifier.load_model_tokenizer(model_path)
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.seq_length = seq_length
-        self.num_ans_para = num_ans_para
-        self.model_type = model_type if model_type is not None else self.model.config.model_type
+    # def __init__(self, model_path, model_type=None, seq_length=512, num_ans_para=1,
+    #              single_para=False):
+    #     self.model, self.tokenizer = QuestionVerifier.load_model_tokenizer(model_path)
+    #     self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    #     self.seq_length = seq_length
+    #     self.num_ans_para = num_ans_para
+    #     self.model_type = model_type if model_type is not None else self.model.config.model_type
+    #     self.question_answers = {}
+    #     self.single_para = single_para
+    def __init__(self, **kwargs):
         self.question_answers = {}
-        self.single_para = single_para
+        self.qa_model = LMQuestionAnswerer(**kwargs)
 
     def reset_question_caches(self):
         self.question_answers.clear()
@@ -146,13 +149,15 @@ class LMQuestionVerifier(QuestionVerifier):
             if key in self.question_answers:
                 answers = self.question_answers[key]
             else:
-                answers = answer_question(question=question, model=self.model,
-                                          model_type=self.model_type,
-                                          paragraphs=[qaconstraint.context],
-                                          tokenizer=self.tokenizer,
-                                          device=self.device, length=self.seq_length,
-                                          num_ans_para=self.num_ans_para,
-                                          single_para=self.single_para)
+                # answers = answer_question(question=question, model=self.model,
+                #                           model_type=self.model_type,
+                #                           paragraphs=[qaconstraint.context],
+                #                           tokenizer=self.tokenizer,
+                #                           device=self.device, length=self.seq_length,
+                #                           num_ans_para=self.num_ans_para,
+                #                           single_para=self.single_para)
+                answers = self.qa_model.answer_question(question=question,
+                                                        paragraphs=[qaconstraint.context])
                 self.question_answers[key] = answers
             if len(answers) == 0:
                 raise ValueError("Atleast empty string should be returned!")
@@ -196,13 +201,19 @@ class LMQuestionVerifier(QuestionVerifier):
 
 class LMSpansQuestionVerifier(QuestionVerifier):
 
-    def __init__(self, model_path, model_type=None, seq_length=512, num_ans_para=10):
-        self.model, self.tokenizer = QuestionVerifier.load_model_tokenizer(model_path)
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.seq_length = seq_length
-        self.num_ans_para = num_ans_para
+    # def __init__(self, model_path, model_type=None, seq_length=512, num_ans_para=10):
+    #     self.model, self.tokenizer = QuestionVerifier.load_model_tokenizer(model_path)
+    #     self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    #     self.seq_length = seq_length
+    #     self.num_ans_para = num_ans_para
+    #     self.question_answers = {}
+    #     self.model_type = model_type if model_type is not None else self.model.config.model_type
+    def __init__(self, **kwargs):
         self.question_answers = {}
-        self.model_type = model_type if model_type is not None else self.model.config.model_type
+        # set num_ans_para to 10 if not set
+        if "num_ans_para" not in kwargs:
+            kwargs["num_ans_para"] = 10
+        self.qa_model = LMQuestionAnswerer(**kwargs)
 
     def reset_question_caches(self):
         self.question_answers.clear()
@@ -240,13 +251,15 @@ class LMSpansQuestionVerifier(QuestionVerifier):
             if key in self.question_answers:
                 answers = self.question_answers[key]
             else:
-                answers = answer_question(question=question, model=self.model,
-                                          model_type=self.model_type,
-                                          paragraphs=[qaconstraint.context],
-                                          tokenizer=self.tokenizer,
-                                          device=self.device, length=self.seq_length,
-                                          num_ans_para=self.num_ans_para,
-                                          return_unique_list=True)
+                # answers = answer_question(question=question, model=self.model,
+                #                           model_type=self.model_type,
+                #                           paragraphs=[qaconstraint.context],
+                #                           tokenizer=self.tokenizer,
+                #                           device=self.device, length=self.seq_length,
+                #                           num_ans_para=self.num_ans_para,
+                #                           return_unique_list=True)
+                answers = self.qa_model.answer_question(question=question,
+                                                        paragraphs=[qaconstraint.context])
                 self.question_answers[key] = answers
             answer_texts = [a.answer for a in answers]
             exp_answer = qaconstraint.aconstraint.exp_ans

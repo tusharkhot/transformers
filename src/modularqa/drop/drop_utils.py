@@ -44,3 +44,16 @@ def number_in_para(number, para):
                re.match(".*\W" + re.escape(number) + "0\W.*", para) is not None
     else:
         return re.match(".*\W" + re.escape(number) + "\W.*", para) is not None
+
+def format_drop_answer(answer_json):
+    if answer_json["number"]:
+        return answer_json["number"], -1
+    if len(answer_json["spans"]):
+        return LIST_JOINER.join(answer_json["spans"]), -1
+    # only date possible
+    date_json = answer_json["date"]
+    if not (date_json["day"] or date_json["month"] or date_json["year"]):
+        print("Number, Span or Date not set in {}".format(answer_json))
+        return None, -1
+    return date_json["day"] + "-" + date_json["month"] + "-" + date_json["year"], -1
+

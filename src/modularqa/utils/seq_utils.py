@@ -17,7 +17,7 @@ def get_sequence_representation(origq: str, question_seq: List[str], answer_seq:
 
     for aidx in range(len(answer_seq)):
         ret_seq += INTERQ_MARKER
-        if model_seq is not None:
+        if model_seq is not None and len(model_seq):
             ret_seq += "(" + model_seq[aidx] + ")"
         ret_seq += question_seq[aidx]
         ret_seq += ANSWER_MARKER + answer_seq[aidx]

@@ -30,8 +30,10 @@ class LMQuestionAnswerer:
     def __init__(self, model_path, model_type=None,
                  hotpotqa_file=None, drop_file=None, only_gold_para=False,
                  seq_length=512, num_ans_para=1, single_para=False):
-        self.model, self.tokenizer = LMQuestionAnswerer.load_model_tokenizer(model_path)
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.model, self.tokenizer = LMQuestionAnswerer.load_model_tokenizer(model_path,
+                                                                             device=self.device)
+
         self.seq_length = seq_length
         self.num_ans_para = num_ans_para
         self.model_type = model_type if model_type is not None else self.model.config.model_type
@@ -45,7 +47,7 @@ class LMQuestionAnswerer:
             self._qid_doc_map = None
 
     @staticmethod
-    def load_model_tokenizer(model_path):
+    def load_model_tokenizer(model_path, device):
         if model_path in LMQuestionAnswerer.path_to_modeltokenizer:
             return LMQuestionAnswerer.path_to_modeltokenizer[model_path]
         else:
@@ -65,7 +67,6 @@ class LMQuestionAnswerer:
                 config=config,
                 cache_dir=None,
             )
-            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
             model.to(device)
             LMQuestionAnswerer.path_to_modeltokenizer[model_path] = (model, tokenizer)
             return model, tokenizer

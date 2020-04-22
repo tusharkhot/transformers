@@ -2,6 +2,7 @@ from modularqa.inference.model_search import ParticipantModel
 
 from modularqa.con_gen.generators import LMQuestionGenerator
 from modularqa.utils.generation import LMGenerator
+from modularqa.utils.seq_utils import get_sequence_representation
 
 
 class LMGenParticipant(LMGenerator, ParticipantModel):
@@ -21,26 +22,19 @@ class LMGenParticipant(LMGenerator, ParticipantModel):
         ## first checks state of `json_input` to figure out how to format things
         ## the first question
         data = state._data
-        init_question = "QC: %s" % data["query"]
         question_seq = data["question_seq"]
         answer_seq = data["answer_seq"]
         model_seq = data["model_seq"]
-        ## now intermediate ones
-        if len(question_seq) != len(answer_seq):
-            raise ValueError("Number of generted questions and answers should match before"
-                             "question generation. Qs: {} As: {}".format(question_seq, answer_seq))
-        if len(model_seq):
-            intermediate = ["QI: (%s) %s A: %s" % (m, q, a) for m, q, a in zip(model_seq, question_seq, answer_seq)]
-        else:
-            intermediate = ["QI: %s A: %s" % (q, a) for q, a in zip(question_seq, answer_seq)]
-        question = "%s %s QS:" % (init_question, ' '.join(intermediate))
-        if debug: print("<GPTGen>: %s" % question)
+        gen_seq = get_sequence_representation(origq=data["query"], question_seq=question_seq,
+                                              answer_seq=answer_seq, model_seq=model_seq,
+                                              for_generation=True)
+        if debug: print("<GPTGen>: %s" % gen_seq)
 
         ## eventual output
         new_states = []
 
         ## go through generated questions
-        for output in self.generate_sequences(question):
+        for output in self.generate_sequences(gen_seq):
             output = output.strip()
             # copy state
             new_state = state.copy()

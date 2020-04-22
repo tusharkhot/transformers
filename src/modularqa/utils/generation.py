@@ -22,9 +22,8 @@ class LMGenerator():
                  top_k=0,
                  temperature=1.0):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
         ## set up the model
-        self.model, self.tokenizer = LMGenerator.load_model_tokenizer(model_path)
+        self.model, self.tokenizer = LMGenerator.load_model_tokenizer(model_path, device=self.device)
         self.model_type = model_type if model_type is not None else self.model.config.model_type
         self.model.eval()
         self.length = length
@@ -47,7 +46,7 @@ class LMGenerator():
         return outputs
 
     @staticmethod
-    def load_model_tokenizer(model_path):
+    def load_model_tokenizer(model_path, device):
         if model_path in LMGenerator.path_to_modeltokenizer:
             return LMGenerator.path_to_modeltokenizer[model_path]
         else:
@@ -67,7 +66,6 @@ class LMGenerator():
                 config=config,
                 cache_dir=None,
             )
-            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
             model.to(device)
             LMGenerator.path_to_modeltokenizer[model_path] = (model, tokenizer)
             return model, tokenizer

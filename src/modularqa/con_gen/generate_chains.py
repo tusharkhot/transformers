@@ -38,6 +38,7 @@ def create_labelled_chains(output_json, generator_verifiers,
     qaconstraints = [QAConstraint.from_json(c) for c in output_json["constraints"]]
     qam_chains = [([], [], [])]
     origq = output_json["question"]
+    observed_sequences = set()
     for idx, constraint in enumerate(qaconstraints):
         if constraint.model == "FAILED":
             return positive_chains, negative_chains
@@ -50,6 +51,10 @@ def create_labelled_chains(output_json, generator_verifiers,
             for q, a, m in zip(q_chain, a_chain, m_chain):
                 current_sequence += INTERQ_MARKER + "(" + m + ") " + q + ANSWER_MARKER + a
             current_sequence += SIMPQ_MARKER
+            if current_sequence in observed_sequences:
+                continue
+            else:
+                observed_sequences.add(current_sequence)
             # generate next question
             sequences = decomposer_generator.generate_sequences(sequence=current_sequence)
             sequences = list(set(sequences))
@@ -121,7 +126,7 @@ if __name__ == '__main__':
     args = parse_arguments()
     generator_verifiers = load_generator_verifiers(args.config)
     model_path = args.decomposer_model
-    generator = LMGenerator(model_path=model_path, num_samples=10, top_p=0.95)
+    generator = LMGenerator(model_path=model_path, num_samples=5, top_p=0.95)
     counter = 0
     num_pos = 0
     num_neg = 0

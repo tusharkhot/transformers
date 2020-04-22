@@ -17,12 +17,16 @@ class ModelRouter(ParticipantModel):
         data = state._data
         question = data["question_seq"][-1]
         qid = data["qid"]
+        new_state = state.copy()
+        if question == "[EOQ]":
+            new_state._next = "EOQ"
+            return [new_state]
         m = self.question_pattern.match(question)
         if m:
             send_to = m.group(1)
             new_q = m.group(2)
             if debug: print("<ROUTE>: %s, qid=%s, route=%s" % (new_q, qid, send_to))
-            new_state = state.copy()
+
             new_state._data["model_seq"].append(send_to)
             new_state._data["question_seq"][-1] = new_q
             new_state._data["command_seq"].append("route")
@@ -56,6 +60,10 @@ class LMQAParticipant(LMQuestionAnswerer, ParticipantModel):
         data = state._data
         question = data["question_seq"][-1]
         qid = data["qid"]
+        if question == "[EOQ]":
+            new_state = state.copy()
+            new_state._next = "EOQ"
+            return [new_state]
 
         ### run the model (as before)
         if debug: print("<BERTQA>: %s, qid=%s" % (question, qid))

@@ -97,7 +97,8 @@ class LMQuestionAnswerer:
                 raise ValueError("QID: {} not found in the qid->doc map loaded.".format(qid))
             else:
                 doc_map = self._qid_doc_map[qid]
-                paragraphs = [t + TITLE_DELIM + " ".join(doc) for (t, doc) in doc_map.items()]
+                # ignore title as it is not present in SQuAD models
+                paragraphs = [" ".join(doc) for (t, doc) in doc_map.items()]
                 return self.answer_question(question, paragraphs, normalize=normalize)
 
     def get_qid_doc_map_hotpotqa(self, para_file, only_gold_para):

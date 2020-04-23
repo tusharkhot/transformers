@@ -151,6 +151,21 @@ class LMQualityChecker(ParticipantModel):
             print("<QUALITYCHECK>: Qs: {} As: {} Q: {}".format(
                 ", ".join(qchain), ", ".join(achain), origq))
 
+        # check for correct usage of answers
+        if qchain[-1] == "[EOQ]":
+            new_qchain = deepcopy(qchain)
+            new_qchain.pop(-1)
+            new_tok_score, missed_tok_score, new_toks, missed_toks, unmatched_answers = \
+                score_question_answer_chain(new_qchain, achain, origq, repeat_ok=False,
+                                            score_answers=True)
+            if unmatched_answers > 0:
+                if debug:
+                    print("Unmatched answers! Rejecting!"
+                          "Qs: {} As: {} Q: {}".format(", ".join(qchain), ", ".join(achain), origq))
+                new_state._score = float("inf")
+                new_state.last_output = "Rejected for bad answers"
+                return new_state
+
         sequence = get_sequence_representation(origq, qchain, achain, mchain, for_generation=False)
         dataset = self.create_dataset(sequence)
         output_probs = self.classify_dataset(dataset)

@@ -5,7 +5,7 @@ from modularqa.inference.participant_qa import LMQAParticipant, MathQAParticipan
     ModelRouter
 from modularqa.inference.participant_qgen import LMGenParticipant
 from modularqa.inference.quality_checkers import QualityCheckerExample, ChainOverlapScorer, \
-    BertQualityChecker
+    LMQualityChecker
 
 MODEL_NAME_CLASS = {
     "lmgen": LMGenParticipant,
@@ -14,7 +14,7 @@ MODEL_NAME_CLASS = {
     "qual_overlap": ChainOverlapScorer,
     "mathqa": MathQAParticipant,
     "model_router": ModelRouter,
-    "qual_bert": BertQualityChecker
+    "qual_lm": LMQualityChecker
 }
 
 READER_NAME_CLASS: Dict[str, DatasetReader] = {

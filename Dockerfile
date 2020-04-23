@@ -45,6 +45,7 @@ RUN python3 -m pip install --no-cache-dir \
     torch \
     tensorboard
 
+RUN python3 -m pip install --no-cache-dir sklearn
 
 COPY README.md .
 COPY setup.py .

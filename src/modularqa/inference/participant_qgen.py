@@ -34,7 +34,7 @@ class LMGenParticipant(LMGenerator, ParticipantModel):
         new_states = []
 
         ## go through generated questions
-        for output in self.generate_sequences(gen_seq):
+        for output in list(set(self.generate_sequences(gen_seq))):
             output = output.strip()
             # copy state
             new_state = state.copy()

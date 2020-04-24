@@ -15,6 +15,8 @@ def parse_arguments():
     arg_parser.add_argument('--input', type=str, required=True, help="Input JSON file")
     arg_parser.add_argument('--output', type=str, required=True, help="Output TXT file")
     arg_parser.add_argument('--config', type=str, required=True, help="Model configs")
+    arg_parser.add_argument('--num_samples', type=int, default=5,
+                            help="Number of questions to generate")
     arg_parser.add_argument('--decomposer_model', type=str, required=True,
                             help="Decomposer GPT model path")
     return arg_parser.parse_args()
@@ -135,7 +137,7 @@ if __name__ == '__main__':
     args = parse_arguments()
     generator_verifiers = load_generator_verifiers(args.config)
     model_path = args.decomposer_model
-    generator = LMGenerator(model_path=model_path, num_samples=5, top_p=0.95)
+    generator = LMGenerator(model_path=model_path, num_samples=args.num_samples, top_p=0.95)
     counter = 0
     num_pos = 0
     num_neg = 0

@@ -32,6 +32,10 @@ def default_filter_tokenization(input_str):
     return stem_tokens(filter_stop_tokens(tokenize_str(input_str.lower())))
 
 
+def tokenize_document(para):
+    return default_filter_tokenization(para)
+
+
 def tokenize_question(question):
     # drop wh-words
     qtokens = default_filter_tokenization(question)

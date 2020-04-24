@@ -6,6 +6,7 @@ import torch
 
 from examples.run_squad import to_list
 from modularqa.con_gen.constants import TITLE_DELIM
+from modularqa.utils.str_utils import tokenize_question, tokenize_document, overlap_score
 from transformers import AutoConfig, AutoTokenizer, AutoModelForQuestionAnswering
 from transformers import SquadV2Processor, squad_convert_examples_to_features
 from transformers.data.metrics.squad_metrics import compute_predictions_log_probs, \
@@ -29,7 +30,7 @@ class LMQuestionAnswerer:
 
     def __init__(self, model_path, model_type=None,
                  hotpotqa_file=None, drop_file=None, only_gold_para=False,
-                 seq_length=512, num_ans_para=1, single_para=False):
+                 seq_length=512, num_ans_para=1, single_para=False, merge_select_para=False):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model, self.tokenizer = LMQuestionAnswerer.load_model_tokenizer(model_path,
                                                                              device=self.device)
@@ -38,6 +39,7 @@ class LMQuestionAnswerer:
         self.num_ans_para = num_ans_para
         self.model_type = model_type if model_type is not None else self.model.config.model_type
         self.single_para = single_para
+        self.merge_select_para = merge_select_para
         # if para_file is passed, load the documents from this file
         if hotpotqa_file is not None:
             self._qid_doc_map = self.get_qid_doc_map_hotpotqa(hotpotqa_file, only_gold_para)
@@ -78,6 +80,7 @@ class LMQuestionAnswerer:
                                tokenizer=self.tokenizer,
                                device=self.device, length=self.seq_length,
                                num_ans_para=self.num_ans_para,
+                               merge_select_para=self.merge_select_para,
                                normalize=normalize,
                                single_para=self.single_para)
 
@@ -142,6 +145,7 @@ def answer_question(question: str,
                     num_ans_para,
                     single_para=False,
                     normalize=False,
+                    merge_select_para=False,
                     return_unique_list=False) -> List[QAAnswer]:
     """
     Answer question using BERT
@@ -154,6 +158,8 @@ def answer_question(question: str,
     model.eval()
     # start = time()
     prediction_json = {}
+    if merge_select_para:
+        paragraphs = select_and_merge(paragraphs, question)
     if single_para:
         for i, curr_paragraph in enumerate(paragraphs):
             examples, features, dataset = get_example_features_dataset([curr_paragraph], question,
@@ -232,6 +238,22 @@ def answer_question(question: str,
             return []
         else:
             return [QAAnswer("", 10.0, "")]
+
+
+def select_and_merge(paragraphs: List[str], question:str):
+    qtokens = tokenize_question(question)
+    # use all
+    if len(qtokens) == 0:
+        return paragraphs
+    para_score = []
+    for para in paragraphs:
+        para_tokens = tokenize_document(para)
+        score = overlap_score(qtokens, para_tokens)
+        para_score.append((score, para))
+
+    para_score.sort(key=lambda x: -x[0])
+    # take top 2 and merge
+    return ["  ".join([x[1] for x in para_score[:2]])]
 
 
 def get_example_features_dataset(paragraphs: List[str], question, tokenizer, seq_length):

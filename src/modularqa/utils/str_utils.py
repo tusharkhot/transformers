@@ -3,6 +3,8 @@ from typing import List
 from nltk import word_tokenize
 from nltk.corpus import stopwords
 from nltk.stem.porter import PorterStemmer
+import string
+
 
 stemmer = PorterStemmer()
 
@@ -100,4 +102,4 @@ def np_chunks(text: str):
 
 
 def is_stopword(word: str):
-    return word.lower() in stop_words_set
+    return word.lower() in stop_words_set or word in string.punctuation

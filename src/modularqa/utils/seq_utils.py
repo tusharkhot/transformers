@@ -30,10 +30,8 @@ def get_sequence_representation(origq: str, question_seq: List[str], answer_seq:
     return ret_seq
 
 
-
 def score_question_answer_chain(qchain: List[str], achain: List[str], complexq: str,
-                                repeat_ok=True, score_answers = False) \
-        -> Tuple[float, float, List[str], List[str]]:
+                                repeat_ok=True, score_answers = False):
     if len(qchain) > len(achain) + 1 or len(qchain) < len(achain):
         raise ValueError("Mismatch in question chain and answer chain lengths!: {}\n{}".format(
             qchain, achain

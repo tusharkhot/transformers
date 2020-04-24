@@ -7,6 +7,7 @@ from modularqa.con_gen.constants import COMPQ_MARKER, INTERQ_MARKER, ANSWER_MARK
 from modularqa.con_gen.constraints import QAConstraint
 from modularqa.con_gen.generator_verifier import QuestionGeneratorVerifier
 from modularqa.utils.generation import LMGenerator
+from modularqa.utils.seq_utils import score_question_answer_chain
 
 
 def parse_arguments():
@@ -38,6 +39,7 @@ def create_labelled_chains(output_json, generator_verifiers,
     qaconstraints = [QAConstraint.from_json(c) for c in output_json["constraints"]]
     qam_chains = [([], [], [])]
     origq = output_json["question"]
+    qid = output_json["id"]
     observed_sequences = set()
     for idx, constraint in enumerate(qaconstraints):
         if constraint.model == "FAILED":
@@ -84,7 +86,8 @@ def create_labelled_chains(output_json, generator_verifiers,
                     negative_chains.append(sequence)
                     continue
             verifier = generator_verifiers[constraint.model].qa
-            subquestions, subanswers, metadata = verifier.verify_questions(constraint,
+            subquestions, subanswers, metadata = verifier.verify_questions(qid,
+                                                                           constraint,
                                                                            predicted_questions,
                                                                            previous_questions=q_chain,
                                                                            previous_answers=a_chain)
@@ -115,7 +118,13 @@ def create_labelled_chains(output_json, generator_verifiers,
         for new_q in sequences:
             sequence = current_sequence + new_q
             if new_q == "[EOQ]":
-                positive_chains.append(sequence)
+                new_tok_score, missed_tok_score, new_toks, missed_toks, unmatched_answers = \
+                    score_question_answer_chain(q_chain, a_chain, origq, repeat_ok=False,
+                                                score_answers=True)
+                if unmatched_answers > 0:
+                    negative_chains.append(sequence)
+                else:
+                    positive_chains.append(sequence)
             else:
                 negative_chains.append(sequence)
 

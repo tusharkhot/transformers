@@ -102,6 +102,7 @@ class LMQuestionAnswerer:
                 return self.answer_question(question, paragraphs, normalize=normalize)
 
     def get_qid_doc_map_hotpotqa(self, para_file, only_gold_para):
+        print("Loading paragraphs from {}".format(para_file))
         with open(para_file, "r") as input_fp:
             input_json = json.load(input_fp)
         qid_doc_map = {}
@@ -118,6 +119,7 @@ class LMQuestionAnswerer:
         return qid_doc_map
 
     def get_qid_doc_map_drop(self, drop_file):
+        print("Loading paragraphs from {}".format(drop_file))
         with open(drop_file, "r") as input_fp:
             input_json = json.load(input_fp)
         qid_doc_map = {}

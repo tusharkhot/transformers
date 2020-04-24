@@ -37,6 +37,7 @@ def create_question_chains(output_json, generator_verifiers):
     qaconstraints = [QAConstraint.from_json(c) for c in output_json["constraints"]]
     qa_chains = [(None, None)]
     origq = output_json["question"]
+    qid = output_json["id"]
     for idx, constraint in enumerate(qaconstraints):
         model = constraint.model
         output_json["constraints"][idx]["subquestions"] = []
@@ -48,6 +49,7 @@ def create_question_chains(output_json, generator_verifiers):
             newa_chains = []
             for q_chain, a_chain in qa_chains:
                 subquestions, subanswers, metadata = generator_verifier.generate_questions(
+                    qid=qid,
                     constraint=constraint,
                     previous_questions=q_chain,
                     previous_answers=a_chain

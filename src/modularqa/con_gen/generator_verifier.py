@@ -15,7 +15,7 @@ class QuestionGeneratorVerifier:
         self.time_per_model = {}
         self.count_per_model = {}
 
-    def generate_questions(self, constraint: QAConstraint,
+    def generate_questions(self, qid: str, constraint: QAConstraint,
                            previous_questions: List[str] = None,
                            previous_answers: List[str] = None) -> Tuple[List[str], List[str],
                                                                         Dict[Any, Any]]:
@@ -45,7 +45,7 @@ class BasicGeneratorVerifier(QuestionGeneratorVerifier):
         self.qgen.reset_question_caches()
         self.qa.reset_question_caches()
 
-    def generate_questions(self, constraint: QAConstraint,
+    def generate_questions(self, qid: str, constraint: QAConstraint,
                            previous_questions: List[str] = None,
                            previous_answers: List[str] = None) -> Tuple[List[str], List[str],
                                                                         Dict[Any, Any]]:
@@ -63,6 +63,7 @@ class BasicGeneratorVerifier(QuestionGeneratorVerifier):
 
         start = time.time()
         sel_question, pred_answers, qver_meta = self.qa.verify_questions(
+            qid=qid,
             qaconstraint=constraint,
             questions=questions,
             previous_questions=previous_questions,

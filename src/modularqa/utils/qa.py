@@ -201,7 +201,9 @@ def answer_question(question: str,
             if pred["text"] == "" or (pred["text"] == "empty" and pred["start_logit"] == 0):
                 break
             else:
-                predicted_spans.append((pred["text"], pred["probability"], para))
+                prob = np.exp((pred["start_logit"] + pred["end_logit"])/2)
+                #prob = pred["probability"]
+                predicted_spans.append((pred["text"], prob, para))
 
     if len(predicted_spans):
         answer_list = [QAAnswer(text, prob, para)

@@ -201,8 +201,8 @@ def answer_question(question: str,
             if pred["text"] == "" or (pred["text"] == "empty" and pred["start_logit"] == 0):
                 break
             else:
-                prob = np.exp((pred["start_logit"] + pred["end_logit"])/2)
-                #prob = pred["probability"]
+                #prob = np.exp((pred["start_logit"] + pred["end_logit"])/2)
+                prob = pred["probability"]
                 predicted_spans.append((pred["text"], prob, para))
 
     if len(predicted_spans):
@@ -278,6 +278,10 @@ def get_example_features_dataset(paragraphs: List[str], question, tokenizer, seq
             ]
         })
     examples = processor._create_examples(input_data, "dev")
+    if len(examples) > 1:
+        pad_to_max = True
+    else:
+        pad_to_max = False
     features, dataset = squad_convert_examples_to_features(
         examples=examples,
         tokenizer=tokenizer,
@@ -287,7 +291,7 @@ def get_example_features_dataset(paragraphs: List[str], question, tokenizer, seq
         is_training=False,
         return_dataset="pt",
         threads=1,
-        pad_to_max=False  # we will take care of padding
+        pad_to_max=pad_to_max
     )
     return examples, features, dataset
 

@@ -90,33 +90,8 @@ class DummyGenerator(QuestionGenerator):
 
 
 class LMQuestionGenerator(QuestionGenerator):
-    #
-    # def __init__(self,
-    #              model_path,
-    #              model_type=None,
-    #              length=30,
-    #              num_samples=20,
-    #              top_p=0.9,
-    #              top_k=0,
-    #              temperature=1.0,
-    #              sample_hints_groups=1,
-    #              format="c_h_a_q"):
-    #     self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    #
-    #     ## set up the model
-    #     self.model, self.tokenizer = QuestionGenerator.load_model_tokenizer(model_path)
-    #     self.model_type = model_type if model_type is not None else self.model.config.model_type
-    #     self.model.eval()
-    #     self.length = length
-    #     self.num_samples = num_samples
-    #     self.top_p = top_p
-    #     self.top_k = top_k
-    #     self.format = format
-    #     self.temperature = temperature
-    #     self.sample_hints_groups = sample_hints_groups
-    #     self.cached_questions = {}
 
-    def __init__(self, sample_hints_groups, format="c_h_a_q", **kwargs):
+    def __init__(self, sample_hints_groups=1, format="c_h_a_q", **kwargs):
         self.sample_hints_groups = sample_hints_groups
         self.cached_questions = {}
         self.format = format
@@ -195,25 +170,70 @@ class MathQuestionGenerator(QuestionGenerator):
     def generate_questions(self, qaconstraint: QAConstraint,
                            previous_questions: List[str] = None,
                            previous_answers: List[str] = None) -> Tuple[List[str], Dict[Any, Any]]:
-        if len(qaconstraint.qconstraint.hints) == 1:
-            operation = qaconstraint.qconstraint.hints[0]
-            if operation not in self.valid_operations:
-                raise ValueError("Cannot handle operation: {} in math questions".format(operation))
+
+
+        count_questions, count_metadata = self.generate_count_questions(qaconstraint, previous_questions,
+                                                                  previous_answers)
+
+        diff_questions, diff_metadata = self.generate_diff_questions(qaconstraint, previous_questions,
+                                                                  previous_answers)
+
+        not_questions, not_metadata = self.generate_not_questions(qaconstraint, previous_questions,
+                                                                  previous_answers)
+
+        ifthen_questions, ifthen_metadata = self.generate_ifthen_questions(qaconstraint, previous_questions,
+                                                                  previous_answers)
+
+
+        question_list = count_questions + diff_questions + not_questions + ifthen_questions
+        metadata = {
+            "count": count_metadata,
+            "diff": diff_metadata,
+            "not": not_metadata,
+            "ifthen": ifthen_metadata
+        }
+        if len(question_list) == 0:
+            raise ValueError("Cannot handle hints: {} in math questions".format(
+                    qaconstraint.qconstraint.hints))
+            return [], {}
+        else:
+            return question_list, metadata
+
+    def generate_count_questions(self, qaconstraint, previous_questions, previous_answers):
+        if "count" in qaconstraint.qconstraint.hints or "number" in qaconstraint.qconstraint.hints:
             if qaconstraint.aconstraint.exp_ans_type != "number":
                 raise ValueError("Expected answer is not a number for a math operation!{}".format(
                     qaconstraint.to_json()
                 ))
-            if operation == "count":
-                if previous_answers is None or len(previous_answers) == 0:
-                    raise ValueError("Count operation has no previous answers!: {}".format(
-                        qaconstraint))
-                question = "count(" + previous_answers[-1] + ")"
-                metadata = {}
-                return [question], metadata
-            if operation == "diff":
+            if previous_answers is None or len(previous_answers) == 0:
+                raise ValueError("Count operation has no previous answers!: {}".format(
+                    qaconstraint))
+            if qaconstraint.qconstraint.use_answer_idxs:
+                if len(qaconstraint.qconstraint.use_answer_idxs) != 1:
+                    raise ValueError("Count constraint should only have one answer to count over!"
+                                     "{}".format(qaconstraint.qconstraint))
+                ans = previous_answers[qaconstraint.qconstraint.use_answer_idxs[0]]
+            else:
+                ans = previous_answers[-1]
+            question = "count(" + ans + ")"
+            metadata = {}
+            return [question], metadata
+        return [], {}
+
+
+    def generate_diff_questions(self, qaconstraint, previous_questions, previous_answers):
+        if "difference" in qaconstraint.qconstraint.hints or "diff" in qaconstraint.qconstraint.hints:
                 questions = []
                 metadata = {}
-                potential_numbers = self.get_potential_numbers(previous_answers)
+                if qaconstraint.qconstraint.use_answer_idxs:
+                    if len(qaconstraint.qconstraint.use_answer_idxs) != 2:
+                        raise ValueError("Diff constraint should only two answer to count over!"
+                                         "{}".format(qaconstraint.qconstraint))
+                    potential_numbers = [get_number(previous_answers[aidx])
+                                         for aidx in qaconstraint.qconstraint.use_answer_idxs]
+                else:
+                    potential_numbers = self.get_potential_numbers(previous_answers)
+
                 if len(potential_numbers) < 2:
                     metadata = {
                         "error": "Not enough numbers to compute difference"
@@ -224,26 +244,47 @@ class MathQuestionGenerator(QuestionGenerator):
                         questions.append("diff(" + str(pair[0]) + ", " + str(pair[1]) + ")")
                         questions.append("diff(" + str(pair[1]) + ", " + str(pair[0]) + ")")
                 return questions, metadata
-            if operation == "not":
-                questions = []
-                metadata = {}
+        return [], {}
+
+
+    def generate_not_questions(self, qaconstraint, previous_questions, previous_answers):
+        if "not" in qaconstraint.qconstraint.hints:
+            questions = []
+            metadata = {}
+            if qaconstraint.qconstraint.use_answer_idxs:
+                if len(qaconstraint.qconstraint.use_answer_idxs) != 1:
+                    raise ValueError("Not constraint should only one answer to count over!"
+                                     "{}".format(qaconstraint.qconstraint))
+                potential_numbers = [get_number(previous_answers[aidx])
+                                     for aidx in qaconstraint.qconstraint.use_answer_idxs]
+            else:
                 potential_numbers = self.get_potential_numbers(previous_answers)
-                filtered_numbers = [n for n in potential_numbers if n <= 100]
-                if len(potential_numbers) < 1:
-                    metadata = {
-                        "error": "Not enough numbers to compute not: {}".format(potential_numbers)
-                    }
-                else:
-                    for number in filtered_numbers:
-                        questions.append("not(" + str(number) + ")")
-                return questions, metadata
-        elif len(qaconstraint.qconstraint.hints) == 3 and \
-                "if_then" in qaconstraint.qconstraint.hints:
+            filtered_numbers = [n for n in potential_numbers if n <= 100]
+            if len(filtered_numbers) < 1:
+                metadata = {
+                    "error": "Not enough numbers to compute not: {}".format(filtered_numbers)
+                }
+            else:
+                for number in filtered_numbers:
+                    questions.append("not(" + str(number) + ")")
+            return questions, metadata
+        return [], {}
+
+
+    def generate_ifthen_questions(self, qaconstraint, previous_questions, previous_answers):
+        if "if_then" in qaconstraint.qconstraint.hints:
             entities = deepcopy(qaconstraint.qconstraint.hints)
             entities.remove("if_then")
             questions = []
             metadata = {}
-            potential_numbers = self.get_potential_numbers(previous_answers)
+            if qaconstraint.qconstraint.use_answer_idxs:
+                if len(qaconstraint.qconstraint.use_answer_idxs) != 2:
+                    raise ValueError("If then constraint should only two answer to count over!"
+                                     "{}".format(qaconstraint.qconstraint))
+                potential_numbers = [get_number(previous_answers[aidx])
+                                     for aidx in qaconstraint.qconstraint.use_answer_idxs]
+            else:
+                potential_numbers = self.get_potential_numbers(previous_answers)
             if len(potential_numbers) < 2:
                 metadata = {
                     "error": "Not enough numbers to compute difference"
@@ -257,10 +298,6 @@ class MathQuestionGenerator(QuestionGenerator):
                     questions.append("if_then(" + str(pair[1]) + " > " + str(pair[0]) + ", " +
                                      ", ".join(entities) + ")")
             return questions, metadata
-        else:
-            raise ValueError("Cannot handle hints: {} in math questions".format(
-                qaconstraint.qconstraint.hints))
-        return [], {}
 
     @classmethod
     def load_from_json(cls, input_json):

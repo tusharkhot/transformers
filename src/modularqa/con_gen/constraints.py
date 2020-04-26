@@ -25,14 +25,17 @@ class QuestionConstraint:
     Constraints over the questions
     """
 
-    def __init__(self, hints: List[str]):
+    def __init__(self, hints: List[str], use_answer_idxs: List[int] = None, original_op=None):
         self.hints = hints
+        self.use_answer_idxs = use_answer_idxs
+        self.original_op = original_op
 
     def to_json(self):
         return self.__dict__
 
     def to_str(self):
-        return "hints: " + str(self.hints)
+        return "hints: " + str(self.hints) + "\tanswer_idxs: " + str(self.use_answer_idxs) + \
+               "\t" + self.original_op
 
 
 class QAConstraint:

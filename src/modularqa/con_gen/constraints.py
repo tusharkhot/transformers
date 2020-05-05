@@ -35,7 +35,7 @@ class QuestionConstraint:
 
     def to_str(self):
         return "hints: " + str(self.hints) + "\tanswer_idxs: " + str(self.use_answer_idxs) + \
-               "\t" + self.original_op
+               "\t" + str(self.original_op)
 
 
 class QAConstraint:

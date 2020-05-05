@@ -85,7 +85,10 @@ def create_question_chains(output_json, generator_verifiers):
 
     output_json["qa_chains"] = list(zip(*qa_chains))
     if len(output_json["qa_chains"]):
-        num_chains += len(output_json["qa_chains"][0])
+        if len(output_json["qa_chains"]) == 1 and output_json["qa_chains"][0][0] is None:
+            output_json["qa_chains"] = []
+        else:
+            num_chains += len(output_json["qa_chains"][0])
     return output_json
 
 

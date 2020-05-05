@@ -1,11 +1,10 @@
 import json
+import sys
 from typing import List
 
 import numpy as np
 import torch
 
-from examples.run_squad import to_list
-from modularqa.con_gen.constants import TITLE_DELIM
 from modularqa.utils.str_utils import tokenize_question, tokenize_document, overlap_score
 from transformers import AutoConfig, AutoTokenizer, AutoModelForQuestionAnswering
 from transformers import SquadV2Processor, squad_convert_examples_to_features
@@ -29,8 +28,9 @@ class LMQuestionAnswerer:
     path_to_modeltokenizer = {}
 
     def __init__(self, model_path, model_type=None,
-                 hotpotqa_file=None, drop_file=None, only_gold_para=False,
-                 seq_length=512, num_ans_para=1, single_para=False, merge_select_para=False):
+                 hotpotqa_file=None, drop_file=None, only_gold_para=False, return_all_ans=False,
+                 seq_length=512, num_ans_para=1, single_para=False, merge_select_para=False,
+                 return_unique_list=False):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model, self.tokenizer = LMQuestionAnswerer.load_model_tokenizer(model_path,
                                                                              device=self.device)
@@ -39,7 +39,9 @@ class LMQuestionAnswerer:
         self.num_ans_para = num_ans_para
         self.model_type = model_type if model_type is not None else self.model.config.model_type
         self.single_para = single_para
+        self.return_unique_list = return_unique_list
         self.merge_select_para = merge_select_para
+        self.return_all_ans = return_all_ans
         # if para_file is passed, load the documents from this file
         if hotpotqa_file is not None:
             self._qid_doc_map = self.get_qid_doc_map_hotpotqa(hotpotqa_file, only_gold_para)
@@ -81,7 +83,8 @@ class LMQuestionAnswerer:
                                device=self.device, length=self.seq_length,
                                num_ans_para=self.num_ans_para,
                                merge_select_para=self.merge_select_para,
-                               normalize=normalize,
+                               normalize=normalize, return_all_ans=self.return_all_ans,
+                               return_unique_list=self.return_unique_list,
                                single_para=self.single_para)
 
 
@@ -145,6 +148,7 @@ def answer_question(question: str,
                     num_ans_para,
                     single_para=False,
                     normalize=False,
+                    return_all_ans=False,
                     merge_select_para=False,
                     return_unique_list=False) -> List[QAAnswer]:
     """
@@ -197,8 +201,9 @@ def answer_question(question: str,
         # simple 'hack' to get the paragraph
         para = paragraphs[int(key)]
         for pred in predictions:
+            #print(pred["text"])
             # only consider answers upto "unanswerable" per para
-            if pred["text"] == "" or (pred["text"] == "empty" and pred["start_logit"] == 0):
+            if not return_all_ans and (pred["text"] == "" or (pred["text"] == "empty" and pred["start_logit"] == 0)):
                 break
             else:
                 #prob = np.exp((pred["start_logit"] + pred["end_logit"])/2)
@@ -295,6 +300,8 @@ def get_example_features_dataset(paragraphs: List[str], question, tokenizer, seq
     )
     return examples, features, dataset
 
+def to_list(tensor):
+    return tensor.detach().cpu().tolist()
 
 def get_predictions(examples, features, dataset, model_type, model, tokenizer, device,
                     num_ans_per_para):
@@ -393,3 +400,16 @@ def get_predictions(examples, features, dataset, model_type, model, tokenizer, d
         )
 
     return nbest_predictions
+
+
+if __name__ == '__main__':
+    model_path = sys.argv[1]
+    qa_model = LMQuestionAnswerer(model_path=model_path, num_ans_para=20, return_unique_list=True,
+                                  return_all_ans=True)
+    while True:
+        para = input("Para:")
+        question = input("Question:")
+
+        answers = qa_model.answer_question(question=question, paragraphs=[para])
+        for ans in answers:
+            print(ans.answer, ans.score)

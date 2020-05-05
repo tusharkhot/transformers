@@ -8,7 +8,7 @@ def get_number(answer: str) -> Optional[float]:
     if isinstance(answer, int) or isinstance(answer, float):
         return answer
     answer = answer.strip()
-    m = re.match("^([-+]?([0-9,]+(\.\d*)?|\.\d+)([eE][-+]?\d+)?)[^0-9]*$", answer)
+    m = re.match("^([-+]?([0-9]+[0-9,]*(\.\d*)?|\.\d+)([eE][-+]?\d+)?)[^0-9]*$", answer)
     if m:
         return float(m.group(1).replace(",", ""))
     else:

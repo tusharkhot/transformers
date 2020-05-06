@@ -80,6 +80,7 @@ def generate_text_sequence(model, tokenizer, model_type, prompt_text, device,
         raise ValueError("Model: {} requires preprocessing. Not implemented!".format(model_type))
     else:
         encoded_prompt = tokenizer.encode(prompt_text, add_special_tokens=False,
+                                          max_length=tokenizer.max_len - length,
                                           return_tensors="pt")
     encoded_prompt = encoded_prompt.to(device)
     if model.config.is_encoder_decoder:

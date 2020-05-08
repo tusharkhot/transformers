@@ -38,7 +38,7 @@ class DropReader(DatasetReader):
             for qa_pair in item["qa_pairs"]:
                 question = qa_pair["question"]
                 qid = qa_pair["query_id"]
-                answer, _ = format_drop_answer(qa_pair["answer"], "drop")
+                answer, _ = format_drop_answer(qa_pair["answer"])
                 yield {
                     "qid": qid,
                     "query": question,

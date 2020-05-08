@@ -1,0 +1,29 @@
+{
+  "start_state": "gen",
+  "end_state": "EOQ",
+  "models": {
+    "gen": {
+      "name": "lmgen",
+      "model_path": "../launchpadqa/data/drop_beaker/ex_a5sip20kfxng/",
+      "length": 30,
+      "num_samples": 5
+    },
+    "qa": {
+      "name": "model_router"
+    },
+    "squad": {
+      "name": "lmqa",
+      "model_path": "../launchpadqa/data/squad/roberta_squad2",
+      "single_para": true,
+      "drop_file": "/home/tushark/Data/drop_dataset/drop_dataset_train.json",
+      "num_ans_para": 1
+    },
+    "qal":  {
+      "name": "qual_lm",
+      "model_path": "../launchpadqa/data/hotpot_beaker/hotpot_bart_8_9_roberta/"
+    },
+    "math": {
+      "name": "mathqa"
+    }
+  }
+}

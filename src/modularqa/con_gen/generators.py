@@ -344,8 +344,15 @@ class MathQuestionGenerator(QuestionGenerator):
                     "error": "Not enough bools to compute and"
                 }
                 return [], metadata
-            questions.append("and(" + str(potential_bools[-2]) + ", " + str(potential_bools[-1]))
+            questions.append("and(" + self.yes_no(potential_bools[-2]) + ", " + self.yes_no(potential_bools[-1]) + ")")
             return questions, metadata
+        return [], {}
+    def yes_no(self, bool_value):
+        if bool_value:
+            return "yes"
+        else:
+            return "no"
+
 
     def generate_ifthen_questions(self, qaconstraint, previous_questions, previous_answers):
         # numeric comparison
@@ -406,17 +413,17 @@ class MathQuestionGenerator(QuestionGenerator):
                     "error": "Not enough bools to compute if_then_bool"
                 }
                 return [], metadata
-            if potential_bools[-2] != potential_bools[-1]:
+            if potential_bools[-2] == potential_bools[-1]:
                 metadata = {
                     "error": "Same boolean value returned by both questions!"
                 }
                 return [], metadata
             else:
                 entities = [e.replace(",", " ") for e in entities]
-                questions.append("if_then_bool(" + str(potential_bools[-2]) + " -> " + str(potential_bools[-1]) + ", " +
-                                 entities[0] + ", " + entities[1])
-                questions.append("if_then_bool(" + str(potential_bools[-2]) + " -> " + str(potential_bools[-1]) + ", " +
-                                 entities[1] + ", " + entities[0])
+                questions.append("if_then_bool(" + self.yes_no(potential_bools[-2]) + " -> " + self.yes_no(potential_bools[-1]) + ", " +
+                                 entities[0] + ", " + entities[1] + ")")
+                questions.append("if_then_bool(" + self.yes_no(potential_bools[-2]) + " -> " + self.yes_no(potential_bools[-1]) + ", " +
+                                 entities[1] + ", " + entities[0] + ")")
             return questions, metadata
 
         if "if_then_str" in qaconstraint.qconstraint.hints:
@@ -436,7 +443,7 @@ class MathQuestionGenerator(QuestionGenerator):
                 potential_strs = previous_answers[-2:]
             potential_strs = [e.replace(",", " ") for e in potential_strs]
             questions.append("if_then_str(" + str(potential_strs[-2]) + " != " + str(potential_strs[-1]) + ", " +
-                             "no" + ", " + "yes")
+                             "no" + ", " + "yes" + ")")
             return questions, metadata
         return [], {}
 

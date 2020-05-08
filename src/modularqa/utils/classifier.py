@@ -72,4 +72,4 @@ class LMClassifier():
     def score_sequence(self, sequence1: str, sequence2:str=None):
         dataset = self.create_dataset(sequence1=sequence1, sequence2=sequence2)
         scores = self.classify_dataset(dataset)
-        return scores
+        return scores.tolist()

@@ -3,6 +3,7 @@ from typing import List, Tuple, Dict, Any, Optional
 from modularqa.con_gen.constants import LIST_JOINER
 from modularqa.con_gen.constraints import QAConstraint
 from modularqa.drop.drop_utils import get_number, number_match
+from modularqa.utils.classifier import LMClassifier
 from modularqa.utils.math_qa import MathQA
 from modularqa.utils.qa import LMQuestionAnswerer
 from modularqa.utils.str_utils import tokenize_str, overlap_score
@@ -32,6 +33,9 @@ class QuestionVerifier:
         if input_json["type"] == "lm":
             input_json.pop("type")
             return LMQuestionVerifier.load_from_json(input_json)
+        if input_json["type"] == "lm_bool":
+            input_json.pop("type")
+            return BoolQuestionVerifier.load_from_json(input_json)
         if input_json["type"] == "lm_spans":
             input_json.pop("type")
             return LMSpansQuestionVerifier.load_from_json(input_json)
@@ -234,6 +238,60 @@ class LMSpansQuestionVerifier(QuestionVerifier):
                         selected_answers.append(LIST_JOINER.join(answer_texts))
         return selected_questions, selected_answers, metadata
 
+class BoolQuestionVerifier(QuestionVerifier):
+
+    def __init__(self, **kwargs):
+        self.question_answers = {}
+        self.classifier = LMClassifier(**kwargs)
+
+    @classmethod
+    def load_from_json(cls, input_json):
+        return cls(**input_json)
+
+    def verify_questions(self, qid: str, qaconstraint: QAConstraint,
+                         questions: List[str],
+                         previous_questions: List[str] = None,
+                         previous_answers: List[str] = None) -> Tuple[List[str], List[str],
+                                                                      Dict[Any, Any]]:
+        selected_questions = []
+        selected_answers = []
+        metadata = {"scored_questions": []}
+        for question in questions:
+            key = question + "$$" + qaconstraint.context
+            if key in self.question_answers:
+                scores = self.question_answers[key]
+            else:
+                scores = self.classifier.score_sequence(sequence1=question,
+                                                        sequence2=qaconstraint.context)
+                self.question_answers[key] = scores
+
+            if scores[0] > scores[1]:
+                answer = "no"
+            else:
+                answer = "yes"
+
+
+            exp_answer = qaconstraint.aconstraint.exp_ans
+            if exp_answer is not None:
+                if exp_answer == answer:
+                    answer_score = 1
+                else:
+                    answer_score = 0
+            else:
+                answer_score = None
+
+            metadata["scored_questions"].append({
+                "q": question,
+                "p": answer,
+                "a": exp_answer,
+                "as": answer_score,
+                "score": scores
+            })
+            if question not in selected_questions:
+                if answer_score is None or answer_score > 0:
+                    selected_questions.append(question)
+                    selected_answers.append(answer)
+        return selected_questions, selected_answers, metadata
 
 class MathQuestionVerifier(QuestionVerifier):
 

@@ -8,7 +8,7 @@ from typing import Tuple, List, Dict, Any
 import torch
 
 from modularqa.con_gen.constraints import QAConstraint
-from modularqa.drop.drop_utils import get_number
+from modularqa.drop.drop_utils import get_number, get_bool
 from modularqa.con_gen.constants import HINT_MARKER, HINTS_DELIM, ANSWER_MARKER, QUESTION_MARKER
 from modularqa.utils.generation import generate_text_sequence, LMGenerator
 from transformers import AutoConfig, AutoTokenizer, AutoModelWithLMHead
@@ -167,6 +167,16 @@ class MathQuestionGenerator(QuestionGenerator):
                 potential_numbers.append(num_val)
         return potential_numbers
 
+    def get_potential_bools(self, previous_answers):
+        if previous_answers is None:
+            return []
+        potential_bools = []
+        for answer in previous_answers:
+            num_val = get_bool(answer)
+            if num_val is not None:
+                potential_bools.append(num_val)
+        return potential_bools
+
     def generate_questions(self, qaconstraint: QAConstraint,
                            previous_questions: List[str] = None,
                            previous_answers: List[str] = None) -> Tuple[List[str], Dict[Any, Any]]:
@@ -183,13 +193,16 @@ class MathQuestionGenerator(QuestionGenerator):
         ifthen_questions, ifthen_metadata = self.generate_ifthen_questions(qaconstraint, previous_questions,
                                                                   previous_answers)
 
+        and_questions, and_metadata = self.generate_and_questions(qaconstraint, previous_questions,
+                                                                       previous_answers)
 
-        question_list = count_questions + diff_questions + not_questions + ifthen_questions
+        question_list = count_questions + diff_questions + not_questions + ifthen_questions + and_questions
         metadata = {
             "count": count_metadata,
             "diff": diff_metadata,
             "not": not_metadata,
-            "ifthen": ifthen_metadata
+            "ifthen": ifthen_metadata,
+            "and": and_metadata
         }
         if len(question_list) == 0:
             msg="Cannot handle constraint: {} in math questions".format(qaconstraint.to_str())
@@ -308,42 +321,123 @@ class MathQuestionGenerator(QuestionGenerator):
             return questions, metadata
         return [], {}
 
+    def generate_and_questions(self, qaconstraint, previous_questions, previous_answers):
+        if "and" in qaconstraint.qconstraint.hints and len(qaconstraint.qconstraint.hints) == 1:
+            questions = []
+            metadata = {}
+            if qaconstraint.qconstraint.use_answer_idxs:
+                potential_bools = []
+                for aidx in qaconstraint.qconstraint.use_answer_idxs:
+                    num = get_bool(previous_answers[aidx])
+                    if num is not None:
+                        potential_bools.append(num)
+                if len(potential_bools) < 2:
+                    for hint in qaconstraint.qconstraint.hints:
+                        num = get_bool(hint)
+                        if num is not None:
+                            potential_bools.append(num)
+            else:
+                potential_bools = self.get_potential_bools(previous_answers)
+
+            if len(potential_bools) < 2:
+                metadata = {
+                    "error": "Not enough bools to compute and"
+                }
+                return [], metadata
+            questions.append("and(" + str(potential_bools[-2]) + ", " + str(potential_bools[-1]))
+            return questions, metadata
 
     def generate_ifthen_questions(self, qaconstraint, previous_questions, previous_answers):
-        valid_ifthen_indicators = ["if_then"]
-        for indicator in valid_ifthen_indicators:
-            if indicator in qaconstraint.qconstraint.hints:
-                entities = deepcopy(qaconstraint.qconstraint.hints)
-                entities.remove(indicator)
-                questions = []
-                metadata = {}
-                if qaconstraint.qconstraint.use_answer_idxs:
-                    potential_numbers = []
-                    for aidx in qaconstraint.qconstraint.use_answer_idxs:
-                        num = get_number(previous_answers[aidx])
+        # numeric comparison
+        if "if_then" in qaconstraint.qconstraint.hints:
+            entities = deepcopy(qaconstraint.qconstraint.hints)
+            entities.remove("if_then")
+            questions = []
+            metadata = {}
+            if qaconstraint.qconstraint.use_answer_idxs:
+                potential_numbers = []
+                for aidx in qaconstraint.qconstraint.use_answer_idxs:
+                    num = get_number(previous_answers[aidx])
+                    if num is not None:
+                        potential_numbers.append(num)
+                if len(potential_numbers) < 2:
+                    for hint in qaconstraint.qconstraint.hints:
+                        num = get_number(hint)
                         if num is not None:
                             potential_numbers.append(num)
-                    if len(potential_numbers) < 2:
-                        for hint in qaconstraint.qconstraint.hints:
-                            num = get_number(hint)
-                            if num is not None:
-                                potential_numbers.append(num)
-                else:
-                    potential_numbers = self.get_potential_numbers(previous_answers)
-                if len(potential_numbers) < 2:
-                    metadata = {
-                        "error": "Not enough numbers to compute if_then"
-                    }
-                    return [], metadata
-                else:
-                    number_pairs = itertools.combinations(potential_numbers, 2)
-                    entities = [e.replace(",", " ") for e in entities]
-                    for pair in number_pairs:
-                        questions.append("if_then(" + str(pair[0]) + " > " + str(pair[1]) + ", " +
-                                         ", ".join(entities) + ")")
-                        questions.append("if_then(" + str(pair[1]) + " > " + str(pair[0]) + ", " +
-                                         ", ".join(entities) + ")")
-                return questions, metadata
+            else:
+                potential_numbers = self.get_potential_numbers(previous_answers)
+            if len(potential_numbers) < 2:
+                metadata = {
+                    "error": "Not enough numbers to compute if_then"
+                }
+                return [], metadata
+            else:
+                number_pairs = itertools.combinations(potential_numbers, 2)
+                entities = [e.replace(",", " ") for e in entities]
+                for pair in number_pairs:
+                    questions.append("if_then(" + str(pair[0]) + " > " + str(pair[1]) + ", " +
+                                     ", ".join(entities) + ")")
+                    questions.append("if_then(" + str(pair[1]) + " > " + str(pair[0]) + ", " +
+                                     ", ".join(entities) + ")")
+            return questions, metadata
+
+        # bool comparison
+        if "if_then_bool" in qaconstraint.qconstraint.hints:
+            entities = deepcopy(qaconstraint.qconstraint.hints)
+            entities.remove("if_then_bool")
+            questions = []
+            metadata = {}
+            if qaconstraint.qconstraint.use_answer_idxs:
+                potential_bools = []
+                for aidx in qaconstraint.qconstraint.use_answer_idxs:
+                    num = get_bool(previous_answers[aidx])
+                    if num is not None:
+                        potential_bools.append(num)
+                if len(potential_bools) < 2:
+                    for hint in qaconstraint.qconstraint.hints:
+                        num = get_bool(hint)
+                        if num is not None:
+                            potential_bools.append(num)
+            else:
+                potential_bools = self.get_potential_bools(previous_answers)
+            if len(potential_bools) < 2:
+                metadata = {
+                    "error": "Not enough bools to compute if_then_bool"
+                }
+                return [], metadata
+            if potential_bools[-2] != potential_bools[-1]:
+                metadata = {
+                    "error": "Same boolean value returned by both questions!"
+                }
+                return [], metadata
+            else:
+                entities = [e.replace(",", " ") for e in entities]
+                questions.append("if_then_bool(" + str(potential_bools[-2]) + " -> " + str(potential_bools[-1]) + ", " +
+                                 entities[0] + ", " + entities[1])
+                questions.append("if_then_bool(" + str(potential_bools[-2]) + " -> " + str(potential_bools[-1]) + ", " +
+                                 entities[1] + ", " + entities[0])
+            return questions, metadata
+
+        if "if_then_str" in qaconstraint.qconstraint.hints:
+            entities = deepcopy(qaconstraint.qconstraint.hints)
+            entities.remove("if_then_str")
+            questions = []
+            metadata = {}
+            if len(previous_answers) < 2:
+                metadata = {
+                    "error": "Not enough answers to compute if_then_str"
+                }
+                return [], metadata
+            if qaconstraint.qconstraint.use_answer_idxs:
+                potential_strs = [previous_answers[aidx]
+                                  for aidx in qaconstraint.qconstraint.use_answer_idxs]
+            else:
+                potential_strs = previous_answers[-2:]
+            potential_strs = [e.replace(",", " ") for e in potential_strs]
+            questions.append("if_then_str(" + str(potential_strs[-2]) + " != " + str(potential_strs[-1]) + ", " +
+                             "no" + ", " + "yes")
+            return questions, metadata
         return [], {}
 
 

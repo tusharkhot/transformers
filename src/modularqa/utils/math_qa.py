@@ -1,6 +1,6 @@
 import re
 
-from modularqa.drop.drop_utils import get_subspans, get_number
+from modularqa.drop.drop_utils import get_subspans, get_number, get_bool
 
 
 class MathQA:
@@ -10,7 +10,10 @@ class MathQA:
             "count": self.answer_count_q,
             "diff": self.answer_diff_q,
             "if_then": self.answer_ifthen_q,
-            "not": self.answer_not_q
+            "if_then_bool": self.answer_ifthen_bool_q,
+            "if_then_str": self.answer_ifthen_str_q,
+            "not": self.answer_not_q,
+            "and": self.answer_and_q
         }
 
     def answer_question(self, question: str) -> str:
@@ -33,6 +36,21 @@ class MathQA:
             pred_spans = get_subspans(input_answer)
             pred_length = len(pred_spans)
         return str(pred_length)
+
+    def answer_and_q(self, question: str) -> str:
+        m = re.match("and\((.*), (.*)\)", question)
+        if m is None:
+            print("Can not parse question: {}".format(question))
+            return ""
+        num1 = get_bool(m.group(1))
+        num2 = get_bool(m.group(2))
+        if num1 is None or num2 is None:
+            print("Can not parse question: {}".format(question))
+            return ""
+        if num1 and num2:
+            return "yes"
+        else:
+            return "no"
 
     def answer_diff_q(self, question: str) -> str:
         m = re.match("diff\((.*), (.*)\)", question)
@@ -61,6 +79,43 @@ class MathQA:
         ent1 = m.group(4)
         ent2 = m.group(5)
         if (op == ">" and num1 > num2) or (op == "<" and num1 < num2):
+            pred_ans = ent1
+        else:
+            pred_ans = ent2
+        return pred_ans
+
+    def answer_ifthen_bool_q(self, question: str) -> str:
+        m = re.match("if_then_bool\((.*) -> (.*), (.*), (.*)\)", question)
+        if m is None:
+            print("Can not parse question: {}".format(question))
+            return ""
+        num1 = get_bool(m.group(1))
+        num2 = get_bool(m.group(2))
+        if num1 is None or num2 is None or num1 == num2:
+            print("Can not parse question: {}".format(question))
+            return ""
+        ent1 = m.group(3)
+        ent2 = m.group(4)
+        if num1:
+            pred_ans = ent1
+        else:
+            pred_ans = ent2
+        return pred_ans
+
+
+    def answer_ifthen_str_q(self, question: str) -> str:
+        m = re.match("if_then_str\((.*) != (.*), (.*), (.*)\)", question)
+        if m is None:
+            print("Can not parse question: {}".format(question))
+            return ""
+        str1 = m.group(1)
+        str2 = m.group(2)
+        if str1 == "" or str2 == "":
+            print("Can not parse question: {}".format(question))
+            return ""
+        ent1 = m.group(3)
+        ent2 = m.group(4)
+        if str1 != str2:
             pred_ans = ent1
         else:
             pred_ans = ent2

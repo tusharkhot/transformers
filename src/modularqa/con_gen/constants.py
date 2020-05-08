@@ -17,6 +17,7 @@ TITLE_DELIM = " || "
 SQUAD_MODEL = "squad"
 IF_THEN_MODEL = "if_then"
 MATH_MODEL = "math"
+BOOLQ_MODEL = "math"
 SQUAD_LIST_MODEL = "squad_list"
 
 

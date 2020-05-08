@@ -4,6 +4,12 @@ from typing import List, Optional
 from modularqa.con_gen.constants import LIST_JOINER
 
 
+def get_bool(answer: str) -> bool:
+    if answer == "yes" or answer == "1" or answer == "true":
+        return True
+    return False
+
+
 def get_number(answer: str) -> Optional[float]:
     if isinstance(answer, int) or isinstance(answer, float):
         return answer

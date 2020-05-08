@@ -1,10 +1,11 @@
 from typing import List
-
+import re
 from nltk import word_tokenize
 from nltk.corpus import stopwords
 from nltk.stem.porter import PorterStemmer
 import string
 
+from modularqa.drop.drop_utils import get_number
 
 stemmer = PorterStemmer()
 
@@ -37,6 +38,22 @@ def tokenize_document(para):
 
 
 def tokenize_question(question):
+    m = re.match("\s*\([^\(]+\)\s*(.+)", question)
+    if m:
+        question = m.group(1)
+    qtokens = default_filter_tokenization(question)
+    out_tokens = []
+    for q in qtokens:
+        num = get_number(q)
+        if num is not None:
+            out_tokens.append(str(num))
+        else:
+            if q.lower() not in WH_WORDS and re.match("^[a-zA-Z0-9\.]+.+$", q):
+                out_tokens.append(q)
+    return out_tokens
+
+
+def tokenize_questionv1(question):
     # drop wh-words
     qtokens = default_filter_tokenization(question)
     return [q for q in qtokens if q.lower() not in WH_WORDS]

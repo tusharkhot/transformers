@@ -5,13 +5,10 @@ from collections import Counter
 from copy import deepcopy
 from typing import Tuple, List, Dict, Any
 
-import torch
-
+from modularqa.con_gen.constants import HINT_MARKER, HINTS_DELIM, ANSWER_MARKER, QUESTION_MARKER
 from modularqa.con_gen.constraints import QAConstraint
 from modularqa.drop.drop_utils import get_number, get_bool
-from modularqa.con_gen.constants import HINT_MARKER, HINTS_DELIM, ANSWER_MARKER, QUESTION_MARKER
-from modularqa.utils.generation import generate_text_sequence, LMGenerator
-from transformers import AutoConfig, AutoTokenizer, AutoModelWithLMHead
+from modularqa.utils.generation import LMGenerator
 
 
 class QuestionGenerator:
@@ -39,32 +36,6 @@ class QuestionGenerator:
             input_json.pop("type")
             return DummyGenerator.load_from_json(input_json)
         raise ValueError("Unknown generator type: " + input_json["type"])
-
-    # @staticmethod
-    # def load_model_tokenizer(model_path):
-    #     if model_path in QuestionGenerator.path_to_modeltokenizer:
-    #         return QuestionGenerator.path_to_modeltokenizer[model_path]
-    #     else:
-    #         config = AutoConfig.from_pretrained(
-    #             model_path,
-    #             cache_dir=None,
-    #         )
-    #         tokenizer = AutoTokenizer.from_pretrained(
-    #             model_path,
-    #             do_lower_case=False,
-    #             cache_dir=None,
-    #         )
-    #         print("Loading {} model from: {}".format(config.model_type, model_path))
-    #         model = AutoModelWithLMHead.from_pretrained(
-    #             model_path,
-    #             from_tf=False,
-    #             config=config,
-    #             cache_dir=None,
-    #         )
-    #         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    #         model.to(device)
-    #         QuestionGenerator.path_to_modeltokenizer[model_path] = (model, tokenizer)
-    #         return model, tokenizer
 
     def reset_question_caches(self):
         pass
@@ -134,7 +105,7 @@ class LMQuestionGenerator(QuestionGenerator):
                 sequence += QUESTION_MARKER
                 if sequence in self.cached_questions and g == 0:
                     return self.cached_questions[sequence]
-                num_samples = math.ceil(self.qgen_model.num_samples/self.sample_hints_groups)
+                num_samples = math.ceil(self.qgen_model.num_samples / self.sample_hints_groups)
                 outputs = self.qgen_model.generate_sequences(sequence, num_samples)
                 output_seqs.extend([o for o in outputs if len(o)])
                 output_seqs = list(set(output_seqs))
@@ -181,20 +152,23 @@ class MathQuestionGenerator(QuestionGenerator):
                            previous_questions: List[str] = None,
                            previous_answers: List[str] = None) -> Tuple[List[str], Dict[Any, Any]]:
 
-        count_questions, count_metadata = self.generate_count_questions(qaconstraint, previous_questions,
-                                                                  previous_answers)
+        count_questions, count_metadata = self.generate_count_questions(qaconstraint,
+                                                                        previous_questions,
+                                                                        previous_answers)
 
-        diff_questions, diff_metadata = self.generate_diff_questions(qaconstraint, previous_questions,
-                                                                  previous_answers)
+        diff_questions, diff_metadata = self.generate_diff_questions(qaconstraint,
+                                                                     previous_questions,
+                                                                     previous_answers)
 
         not_questions, not_metadata = self.generate_not_questions(qaconstraint, previous_questions,
                                                                   previous_answers)
 
-        ifthen_questions, ifthen_metadata = self.generate_ifthen_questions(qaconstraint, previous_questions,
-                                                                  previous_answers)
+        ifthen_questions, ifthen_metadata = self.generate_ifthen_questions(qaconstraint,
+                                                                           previous_questions,
+                                                                           previous_answers)
 
         and_questions, and_metadata = self.generate_and_questions(qaconstraint, previous_questions,
-                                                                       previous_answers)
+                                                                  previous_answers)
 
         question_list = count_questions + diff_questions + not_questions + ifthen_questions + and_questions
         metadata = {
@@ -205,7 +179,7 @@ class MathQuestionGenerator(QuestionGenerator):
             "and": and_metadata
         }
         if len(question_list) == 0:
-            msg="Cannot handle constraint: {} in math questions".format(qaconstraint.to_str())
+            msg = "Cannot handle constraint: {} in math questions".format(qaconstraint.to_str())
             metadata["final"] = msg
             return [], metadata
         else:
@@ -222,14 +196,14 @@ class MathQuestionGenerator(QuestionGenerator):
             if previous_answers is None or len(previous_answers) == 0:
                 metadata = {
                     "error": "Count operation has no previous answers!: {}".format(
-                    qaconstraint.to_str())
+                        qaconstraint.to_str())
                 }
                 return [], metadata
             if qaconstraint.qconstraint.use_answer_idxs:
                 if len(qaconstraint.qconstraint.use_answer_idxs) != 1:
                     metadata = {
                         "error": "Count constraint should only have one answer to count over!"
-                                     "{}".format(qaconstraint.qconstraint.to_str())
+                                 "{}".format(qaconstraint.qconstraint.to_str())
                     }
                     return [], metadata
                 ans_idx = qaconstraint.qconstraint.use_answer_idxs[0]
@@ -243,7 +217,6 @@ class MathQuestionGenerator(QuestionGenerator):
             metadata = {}
             return [question], metadata
         return [], {}
-
 
     def generate_diff_questions(self, qaconstraint, previous_questions, previous_answers):
         if "difference" in qaconstraint.qconstraint.hints or "diff" in qaconstraint.qconstraint.hints:
@@ -297,7 +270,6 @@ class MathQuestionGenerator(QuestionGenerator):
                         questions.append("diff(" + str(pair[0]) + ", " + str(pair[1]) + ")")
             return questions, metadata
         return [], {}
-
 
     def generate_not_questions(self, qaconstraint, previous_questions, previous_answers):
         if "not" in qaconstraint.qconstraint.hints:
@@ -353,15 +325,16 @@ class MathQuestionGenerator(QuestionGenerator):
                     "error": "Not enough bools to compute and"
                 }
                 return [], metadata
-            questions.append("and(" + self.yes_no(potential_bools[-2]) + ", " + self.yes_no(potential_bools[-1]) + ")")
+            questions.append("and(" + self.yes_no(potential_bools[-2]) + ", " + self.yes_no(
+                potential_bools[-1]) + ")")
             return questions, metadata
         return [], {}
+
     def yes_no(self, bool_value):
         if bool_value:
             return "yes"
         else:
             return "no"
-
 
     def generate_ifthen_questions(self, qaconstraint, previous_questions, previous_answers):
         # numeric comparison
@@ -429,9 +402,11 @@ class MathQuestionGenerator(QuestionGenerator):
                 return [], metadata
             else:
                 entities = [e.replace(",", " ") for e in entities]
-                questions.append("if_then_bool(" + self.yes_no(potential_bools[-2]) + " -> " + self.yes_no(potential_bools[-1]) + ", " +
+                questions.append("if_then_bool(" + self.yes_no(potential_bools[-2]) +
+                                 " -> " + self.yes_no(potential_bools[-1]) + ", " +
                                  entities[0] + ", " + entities[1] + ")")
-                questions.append("if_then_bool(" + self.yes_no(potential_bools[-2]) + " -> " + self.yes_no(potential_bools[-1]) + ", " +
+                questions.append("if_then_bool(" + self.yes_no(potential_bools[-2]) +
+                                 " -> " + self.yes_no(potential_bools[-1]) + ", " +
                                  entities[1] + ", " + entities[0] + ")")
             return questions, metadata
 
@@ -451,11 +426,11 @@ class MathQuestionGenerator(QuestionGenerator):
             else:
                 potential_strs = previous_answers[-2:]
             potential_strs = [e.replace(",", " ") for e in potential_strs]
-            questions.append("if_then_str(" + str(potential_strs[-2]) + " != " + str(potential_strs[-1]) + ", " +
-                             "no" + ", " + "yes" + ")")
+            questions.append(
+                "if_then_str(" + str(potential_strs[-2]) + " != " + str(potential_strs[-1]) + ", " +
+                "no" + ", " + "yes" + ")")
             return questions, metadata
         return [], {}
-
 
     @classmethod
     def load_from_json(cls, input_json):

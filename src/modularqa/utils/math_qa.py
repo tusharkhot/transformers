@@ -1,7 +1,8 @@
 import re
 
 from modularqa.drop.drop_utils import get_subspans, get_number, get_bool
-
+from dateutil.parser import parse
+from datetime import datetime
 
 class MathQA:
 
@@ -15,6 +16,38 @@ class MathQA:
             "not": self.answer_not_q,
             "and": self.answer_and_q
         }
+
+
+    def date_difference(self, date1: str, date2: str, units: str="years"):
+        try:
+            date1_datetime = parse(date1)
+            date2_datetime = parse(date2)
+        except ValueError:
+            # couldn't parse date
+            return None
+        curr_date = datetime.now()
+
+        # if one doesn't have month set, not usable
+        if date1_datetime.year == curr_date.year and date1_datetime.month == curr_date.month:
+            return None
+        if date2_datetime.year == curr_date.year and date2_datetime.month == curr_date.month:
+            return None
+
+        if date1_datetime.year == curr_date.year and date2_datetime.year != curr_date.year:
+            # one date is relative and other is not
+            date1_datetime = date1_datetime.replace(year=date2_datetime.year)
+        elif date2_datetime.year == curr_date.year and date1_datetime.year != curr_date.year:
+            # one date is relative and other is not
+            date2_datetime = date2_datetime.replace(year=date1_datetime.year)
+
+        if units == "days":
+            return (date1_datetime - date2_datetime).days
+        if units == "months":
+            return (date1_datetime - date2_datetime).months
+        if units == "years":
+            return (date1_datetime - date2_datetime).years
+        raise ValueError("Unknown unit:" + units)
+
 
     def answer_question(self, question: str) -> str:
         for operation, func in self.valid_operation_func.items():
@@ -53,16 +86,36 @@ class MathQA:
             return "no"
 
     def answer_diff_q(self, question: str) -> str:
-        m = re.match("diff\((.*), (.*)\)", question)
+        m = re.match("diff\(([^,]*), ([^,]*)\)", question)
         if m is None:
-            print("Can not parse question: {}".format(question))
-            return ""
-        num1 = get_number(m.group(1))
-        num2 = get_number(m.group(2))
-        if num1 is None or num2 is None:
-            print("Can not parse question: {}".format(question))
-            return ""
-        pred_val = num1 - num2
+            m = re.match("diff\(([^,]*), ([^,]*), ([^,]*)\)", question)
+            if m is None:
+                print("Can not parse question: {}".format(question))
+                return ""
+            else:
+                date1 = m.group(1)
+                date2 = m.group(2)
+                units = m.group(3)
+                date_diff = self.date_difference(date1, date2, units)
+                if date_diff is not None:
+                    pred_val = abs(date_diff)
+                else:
+                    print("Can not parse question: {}".format(question))
+                    return ""
+        else:
+            num1 = get_number(m.group(1))
+            num2 = get_number(m.group(2))
+            if num1 is None or num2 is None:
+                # try date with no units
+                date_diff = self.date_difference(m.group(1), m.group(2))
+                if date_diff is None:
+                    print("Can not parse question: {}".format(question))
+                    return ""
+                else:
+                    pred_val = abs(date_diff)
+            else:
+                # never asks for negative difference
+                pred_val = abs(num1 - num2)
         return str(pred_val)
 
     def answer_ifthen_q(self, question: str) -> str:
@@ -74,11 +127,18 @@ class MathQA:
         op = m.group(2)
         num2 = get_number(m.group(3))
         if num1 is None or num2 is None:
-            print("Can not parse question: {}".format(question))
-            return ""
+            # try date with the smallest unit
+            date_diff = self.date_difference(m.group(1), m.group(3), "days")
+            if date_diff is None:
+                print("Can not parse question: {}".format(question))
+                return ""
+            else:
+                diff_val = date_diff
+        else:
+            diff_val = num1 - num2
         ent1 = m.group(4)
         ent2 = m.group(5)
-        if (op == ">" and num1 > num2) or (op == "<" and num1 < num2):
+        if (op == ">" and diff_val > 0) or (op == "<" and diff_val < 0):
             pred_ans = ent1
         else:
             pred_ans = ent2
@@ -137,17 +197,23 @@ class MathQA:
 if __name__ == '__main__':
     math_qa = MathQA()
     question = "count(23-yd + 14 yd)"
-    answer = math_qa.answer_question(question, [])
+    answer = math_qa.answer_question(question)
     print("Q: {} \n A: {}".format(question, answer))
 
     question = "diff(25.0, 17.0)"
-    answer = math_qa.answer_question(question, [])
+    answer = math_qa.answer_question(question)
     print("Q: {} \n A: {}".format(question, answer))
 
+
+    question = "diff(Jun 2 2011, 3rd Aug, days)"
+    answer = math_qa.answer_question(question)
+    print("Q: {} \n A: {}".format(question, answer))
+
+
     question = "if_then(23 > 15, Obama, Biden)"
-    answer = math_qa.answer_question(question, [])
+    answer = math_qa.answer_question(question)
     print("Q: {} \n A: {}".format(question, answer))
 
     question = "not(.4)"
-    answer = math_qa.answer_question(question, [])
+    answer = math_qa.answer_question(question)
     print("Q: {} \n A: {}".format(question, answer))

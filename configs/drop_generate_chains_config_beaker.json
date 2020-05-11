@@ -1,0 +1,15 @@
+{
+  "squad": {
+    "type": "basic",
+    "qgen": {
+      "type": "dummy"
+    },
+    "qa": {
+      "type": "lm",
+      "model_path": "/qa_bert",
+      "single_para": true,
+      "use_all_paras": true,
+      "hotpotqa_file": "/hotpot/hotpot_train_v1.1.json"
+    }
+  }
+}

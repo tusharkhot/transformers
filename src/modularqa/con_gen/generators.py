@@ -275,7 +275,13 @@ class MathQuestionGenerator(QuestionGenerator):
                             potential_numbers.append(num)
             else:
                 potential_numbers = self.get_potential_numbers(previous_answers)
-
+            units = None
+            if "years" in qaconstraint.qconstraint.hints:
+                units = "years"
+            if "months" in qaconstraint.qconstraint.hints:
+                units = "months"
+            if "days" in qaconstraint.qconstraint.hints:
+                units = "days"
             if len(potential_numbers) < 2:
                 metadata = {
                     "error": "Not enough numbers to compute difference"
@@ -284,8 +290,11 @@ class MathQuestionGenerator(QuestionGenerator):
             else:
                 number_pairs = itertools.combinations(potential_numbers, 2)
                 for pair in number_pairs:
-                    questions.append("diff(" + str(pair[0]) + ", " + str(pair[1]) + ")")
-                    questions.append("diff(" + str(pair[1]) + ", " + str(pair[0]) + ")")
+                    if units:
+                        questions.append("diff(" + str(pair[0]) + ", " + str(pair[1]) +
+                                         ", " + units + ")")
+                    else:
+                        questions.append("diff(" + str(pair[0]) + ", " + str(pair[1]) + ")")
             return questions, metadata
         return [], {}
 

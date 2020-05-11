@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import List, Tuple, Dict, Any, Optional
 
 from modularqa.con_gen.constants import LIST_JOINER
@@ -7,7 +8,7 @@ from modularqa.utils.classifier import LMClassifier
 from modularqa.utils.math_qa import MathQA
 from modularqa.utils.qa import LMQuestionAnswerer
 from modularqa.utils.str_utils import tokenize_str, overlap_score
-
+from dateutil.parser import parse
 
 class QuestionVerifier:
     """
@@ -97,12 +98,22 @@ class LMQuestionVerifier(QuestionVerifier):
     def number_score(self, predicted_answer: str, expected_answer: str):
         pred_num = get_number(predicted_answer)
         exp_num = get_number(expected_answer)
-        if exp_num is None:
-            raise ValueError("Expected value should be a number: {}".format(expected_answer))
+        if exp_num is None or pred_num is None:
+            return 0.0
         return 1.0 if number_match(exp_num, pred_num) else 0.0
 
     def date_score(self, predicted_answer: str, expected_answer: str):
-        raise NotImplementedError("Date matching not implemented!")
+        predicted_date = parse(predicted_answer)
+        expected_date = parse(expected_answer)
+        if predicted_date is None or expected_date is None:
+            return 0.0
+
+        if (predicted_date.year == expected_date.year and
+                predicted_date.month == expected_date.month and
+                predicted_date.day == expected_date.day):
+            return 1.0
+        else:
+            return 0.0
 
     def verify_questions(self, qid: str, qaconstraint: QAConstraint,
                          questions: List[str],
@@ -138,6 +149,11 @@ class LMQuestionVerifier(QuestionVerifier):
                         ascore = self.number_score(pred_answer, exp_answer)
                     elif exp_ans_type == "date":
                         ascore = self.date_score(pred_answer, exp_answer)
+                    elif exp_ans_type == "value":
+                        # number or date
+                        num_score = self.number_score(pred_answer, exp_answer)
+                        date_score = self.date_score(pred_answer, exp_answer)
+                        ascore = max(num_score, date_score)
                     else:
                         raise ValueError("Cannot handle answer type:" +
                                          str(qaconstraint.aconstraint.exp_ans_type))

@@ -1,5 +1,7 @@
 import re
 
+from dateutil.relativedelta import relativedelta
+
 from modularqa.drop.drop_utils import get_subspans, get_number, get_bool
 from dateutil.parser import parse
 from datetime import datetime
@@ -41,11 +43,11 @@ class MathQA:
             date2_datetime = date2_datetime.replace(year=date1_datetime.year)
 
         if units == "days":
-            return (date1_datetime - date2_datetime).days
+            return relativedelta(date1_datetime, date2_datetime).days
         if units == "months":
-            return (date1_datetime - date2_datetime).months
+            return relativedelta(date1_datetime, date2_datetime).months
         if units == "years":
-            return (date1_datetime - date2_datetime).years
+            return relativedelta(date1_datetime, date2_datetime).years
         raise ValueError("Unknown unit:" + units)
 
 

@@ -106,12 +106,12 @@ class LMQuestionVerifier(QuestionVerifier):
     def date_score(self, predicted_answer: str, expected_answer: str):
         try:
             predicted_date = parse(predicted_answer.strip(string.punctuation))
-        except ValueError:
+        except Exception:
             # no date
             return  0.0
         try:
             expected_date = parse(expected_answer)
-        except ValueError:
+        except Exception:
             return 0.0
 
         if predicted_date is None or expected_date is None:

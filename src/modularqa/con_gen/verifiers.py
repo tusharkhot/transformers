@@ -1,3 +1,4 @@
+import string
 from datetime import datetime
 from typing import List, Tuple, Dict, Any, Optional
 
@@ -96,15 +97,23 @@ class LMQuestionVerifier(QuestionVerifier):
         return overlap_score(pred_tokens, exp_tokens)
 
     def number_score(self, predicted_answer: str, expected_answer: str):
-        pred_num = get_number(predicted_answer)
+        pred_num = get_number(predicted_answer.strip(string.punctuation))
         exp_num = get_number(expected_answer)
         if exp_num is None or pred_num is None:
             return 0.0
         return 1.0 if number_match(exp_num, pred_num) else 0.0
 
     def date_score(self, predicted_answer: str, expected_answer: str):
-        predicted_date = parse(predicted_answer)
-        expected_date = parse(expected_answer)
+        try:
+            predicted_date = parse(predicted_answer.strip(string.punctuation))
+        except ValueError:
+            # no date
+            return  0.0
+        try:
+            expected_date = parse(expected_answer)
+        except ValueError:
+            return 0.0
+
         if predicted_date is None or expected_date is None:
             return 0.0
 

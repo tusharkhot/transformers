@@ -19,8 +19,8 @@ class MathQA:
             "and": self.answer_and_q
         }
 
-
-    def date_difference(self, date1: str, date2: str, units: str="years"):
+    @staticmethod
+    def date_difference(date1: str, date2: str, units: str="years"):
         try:
             date1_datetime = parse(date1)
             date2_datetime = parse(date2)

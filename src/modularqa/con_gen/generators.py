@@ -347,7 +347,7 @@ class MathQuestionGenerator(QuestionGenerator):
                 return [], metadata
             else:
                 for number in filtered_numbers:
-                    questions.append(self.make_predicate("not", [number])
+                    questions.append(self.make_predicate("not", [number]))
             return questions, metadata
         return [], {}
 

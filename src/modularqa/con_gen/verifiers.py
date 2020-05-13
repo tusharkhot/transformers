@@ -108,7 +108,7 @@ class LMQuestionVerifier(QuestionVerifier):
             predicted_date = parse(predicted_answer.strip(string.punctuation))
         except Exception:
             # no date
-            return  0.0
+            return 0.0
         try:
             expected_date = parse(expected_answer)
         except Exception:

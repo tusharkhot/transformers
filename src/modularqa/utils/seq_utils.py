@@ -74,6 +74,9 @@ def score_question_answer_chain(qchain: List[str], achain: List[str], complexq: 
         unmatched_answers = 0
         for aidx, atokens in enumerate(achain_tokens[:-1]):
             found_match = False
+            # only stop-word answers will never match
+            if len(atokens) == 0:
+                continue
             # check if it overlaps with at least one question
             for qidx in range(aidx + 1, len(qchain_tokens)):
                 if set(atokens).intersection(set(qchain_tokens[qidx])):

@@ -3,12 +3,14 @@ import math
 import random
 from collections import Counter
 from copy import deepcopy
+from dateutil.parser import parse
 from typing import Tuple, List, Dict, Any
 
 from modularqa.con_gen.constants import HINT_MARKER, HINTS_DELIM, ANSWER_MARKER, QUESTION_MARKER
 from modularqa.con_gen.constraints import QAConstraint
 from modularqa.drop.drop_utils import get_number, get_bool
 from modularqa.utils.generation import LMGenerator
+from modularqa.utils.math_qa import MathQA
 
 
 class QuestionGenerator:
@@ -128,6 +130,36 @@ class MathQuestionGenerator(QuestionGenerator):
     def __init__(self):
         self.valid_operations = ["count", "diff", "not"]
 
+    def get_potential_dates(self, previous_answers):
+        if previous_answers is None:
+            return []
+        potential_dates = []
+        for answer in previous_answers:
+            try:
+                date_val = parse(answer)
+                if date_val:
+                    potential_dates.append(answer)
+            except Exception:
+                # couldn't parse
+                pass
+        return potential_dates
+
+    def valid_number_pair(self, pair):
+        (val1, val2) = pair
+        if -1 <= len(str(val1)) - len(str(val2)) <= 1 and val1 != val2:
+            return True
+        return False
+
+    def valid_date_pair(self, pair):
+        (val1, val2) = pair
+        if MathQA.date_difference(val1, val2) is not None and \
+                MathQA.date_difference(val1, val2, "days") != 0:
+            return True
+
+        return False
+
+
+
     def get_potential_numbers(self, previous_answers):
         if previous_answers is None:
             return []
@@ -135,7 +167,7 @@ class MathQuestionGenerator(QuestionGenerator):
         for answer in previous_answers:
             num_val = get_number(answer)
             if num_val is not None:
-                potential_numbers.append(num_val)
+                potential_numbers.append(answer)
         return potential_numbers
 
     def get_potential_bools(self, previous_answers):
@@ -147,6 +179,7 @@ class MathQuestionGenerator(QuestionGenerator):
             if num_val is not None:
                 potential_bools.append(num_val)
         return potential_bools
+
 
     def generate_questions(self, qaconstraint: QAConstraint,
                            previous_questions: List[str] = None,
@@ -218,6 +251,27 @@ class MathQuestionGenerator(QuestionGenerator):
             return [question], metadata
         return [], {}
 
+
+    def get_comparable_pairs(self, use_answer_idxs, hints, previous_answers):
+        if use_answer_idxs:
+            use_answers = [previous_answers[aidx]
+                           for aidx in use_answer_idxs]
+        else:
+            use_answers = previous_answers
+        potential_numbers = self.get_potential_numbers(use_answers)
+        if len(potential_numbers) < 2:
+            potential_numbers.extend(self.get_potential_numbers(hints))
+        potential_dates = self.get_potential_dates(use_answers)
+        if len(potential_dates) < 2:
+            potential_dates.extend(self.get_potential_dates(hints))
+
+        number_pairs = itertools.combinations(potential_numbers, 2)
+        date_pairs = itertools.combinations(potential_dates, 2)
+
+        return ([p for p in number_pairs if self.valid_number_pair(p)],
+               [p for p in date_pairs if self.valid_date_pair(p)])
+
+
     def generate_diff_questions(self, qaconstraint, previous_questions, previous_answers):
         if "difference" in qaconstraint.qconstraint.hints or "diff" in qaconstraint.qconstraint.hints:
             if qaconstraint.aconstraint.exp_ans_type != "number":
@@ -228,46 +282,32 @@ class MathQuestionGenerator(QuestionGenerator):
                 return [], metadata
             questions = []
             metadata = {}
-            if qaconstraint.qconstraint.use_answer_idxs:
-                potential_numbers = []
-                for aidx in qaconstraint.qconstraint.use_answer_idxs:
-                    num = get_number(previous_answers[aidx])
-                    if num is None:
-                        metadata = {
-                            "error": "Could not extract number from answer: {} for "
-                                     "question: {} to compute difference".format(
-                                previous_answers[aidx], previous_questions[aidx])
-                        }
-                        return [], metadata
-                    else:
-                        potential_numbers.append(num)
-                if len(potential_numbers) < 2:
-                    for hint in qaconstraint.qconstraint.hints:
-                        num = get_number(hint)
-                        if num is not None:
-                            potential_numbers.append(num)
-            else:
-                potential_numbers = self.get_potential_numbers(previous_answers)
-            units = None
+            # default years
+            units = "years"
             if "years" in qaconstraint.qconstraint.hints:
                 units = "years"
             if "months" in qaconstraint.qconstraint.hints:
                 units = "months"
             if "days" in qaconstraint.qconstraint.hints:
                 units = "days"
-            if len(potential_numbers) < 2:
+
+
+            comparable_num_pairs, comparable_date_pairs = self.get_comparable_pairs(
+                qaconstraint.qconstraint.use_answer_idxs,
+                qaconstraint.qconstraint.hints,
+                previous_answers
+            )
+
+            if len(comparable_num_pairs) + len(comparable_date_pairs) == 0:
                 metadata = {
-                    "error": "Not enough numbers to compute difference"
+                    "error": "Not enough comparable dates/numbers to compute difference"
                 }
                 return [], metadata
-            else:
-                number_pairs = itertools.combinations(potential_numbers, 2)
-                for pair in number_pairs:
-                    if units:
-                        questions.append("diff(" + str(pair[0]) + ", " + str(pair[1]) +
-                                         ", " + units + ")")
-                    else:
-                        questions.append("diff(" + str(pair[0]) + ", " + str(pair[1]) + ")")
+
+            for pair in comparable_num_pairs:
+                questions.append("diff(" + str(pair[0]) + ", " + str(pair[1]) + ")")
+            for pair in comparable_date_pairs:
+                questions.append("diff(" + str(pair[0]) + ", " + str(pair[1]) + ", " + units + ")")
             return questions, metadata
         return [], {}
 
@@ -343,28 +383,19 @@ class MathQuestionGenerator(QuestionGenerator):
             entities.remove("if_then")
             questions = []
             metadata = {}
-            if qaconstraint.qconstraint.use_answer_idxs:
-                potential_numbers = []
-                for aidx in qaconstraint.qconstraint.use_answer_idxs:
-                    num = get_number(previous_answers[aidx])
-                    if num is not None:
-                        potential_numbers.append(num)
-                if len(potential_numbers) < 2:
-                    for hint in qaconstraint.qconstraint.hints:
-                        num = get_number(hint)
-                        if num is not None:
-                            potential_numbers.append(num)
-            else:
-                potential_numbers = self.get_potential_numbers(previous_answers)
-            if len(potential_numbers) < 2:
+            comparable_num_pairs, comparable_date_pairs = self.get_comparable_pairs(
+                qaconstraint.qconstraint.use_answer_idxs,
+                qaconstraint.qconstraint.hints,
+                previous_answers
+            )
+            if len(comparable_num_pairs) + len(comparable_date_pairs) == 0:
                 metadata = {
-                    "error": "Not enough numbers to compute if_then"
+                    "error": "Not enough numbers/dates to compute if_then"
                 }
                 return [], metadata
             else:
-                number_pairs = itertools.combinations(potential_numbers, 2)
                 entities = [e.replace(",", " ") for e in entities]
-                for pair in number_pairs:
+                for pair in comparable_num_pairs + comparable_date_pairs:
                     questions.append("if_then(" + str(pair[0]) + " > " + str(pair[1]) + ", " +
                                      ", ".join(entities) + ")")
                     questions.append("if_then(" + str(pair[1]) + " > " + str(pair[0]) + ", " +

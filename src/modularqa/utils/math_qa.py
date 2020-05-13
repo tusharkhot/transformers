@@ -98,7 +98,7 @@ class MathQA:
                 date1 = m.group(1)
                 date2 = m.group(2)
                 units = m.group(3)
-                date_diff = self.date_difference(date1, date2, units)
+                date_diff = MathQA.date_difference(date1, date2, units)
                 if date_diff is not None:
                     pred_val = abs(date_diff)
                 else:
@@ -109,7 +109,7 @@ class MathQA:
             num2 = get_number(m.group(2))
             if num1 is None or num2 is None:
                 # try date with no units
-                date_diff = self.date_difference(m.group(1), m.group(2))
+                date_diff = MathQA.date_difference(m.group(1), m.group(2))
                 if date_diff is None:
                     print("Can not parse question: {}".format(question))
                     return ""
@@ -130,7 +130,7 @@ class MathQA:
         num2 = get_number(m.group(3))
         if num1 is None or num2 is None:
             # try date with the smallest unit
-            date_diff = self.date_difference(m.group(1), m.group(3), "days")
+            date_diff = MathQA.date_difference(m.group(1), m.group(3), "days")
             if date_diff is None:
                 print("Can not parse question: {}".format(question))
                 return ""

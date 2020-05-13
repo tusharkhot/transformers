@@ -158,8 +158,6 @@ class MathQuestionGenerator(QuestionGenerator):
 
         return False
 
-
-
     def get_potential_numbers(self, previous_answers):
         if previous_answers is None:
             return []
@@ -179,6 +177,15 @@ class MathQuestionGenerator(QuestionGenerator):
             if num_val is not None:
                 potential_bools.append(num_val)
         return potential_bools
+
+
+    def make_predicate(self, predicate, args):
+        output = predicate  + "("
+        new_args = [str(a).replace(",", "") for a in args]
+        output += ", ".join(new_args)
+        output += ")"
+        return output
+
 
 
     def generate_questions(self, qaconstraint: QAConstraint,
@@ -246,7 +253,7 @@ class MathQuestionGenerator(QuestionGenerator):
                 ans = previous_answers[ans_idx]
             else:
                 ans = previous_answers[-1]
-            question = "count(" + ans + ")"
+            question = self.make_predicate("count", [ans])
             metadata = {}
             return [question], metadata
         return [], {}
@@ -305,9 +312,11 @@ class MathQuestionGenerator(QuestionGenerator):
                 return [], metadata
 
             for pair in comparable_num_pairs:
-                questions.append("diff(" + str(pair[0]) + ", " + str(pair[1]) + ")")
+                questions.append(self.make_predicate("diff", list(pair)))
+
             for pair in comparable_date_pairs:
-                questions.append("diff(" + str(pair[0]) + ", " + str(pair[1]) + ", " + units + ")")
+                questions.append(self.make_predicate("diff", list(pair) + [units]))
+
             return questions, metadata
         return [], {}
 
@@ -330,7 +339,7 @@ class MathQuestionGenerator(QuestionGenerator):
                                      for aidx in qaconstraint.qconstraint.use_answer_idxs]
             else:
                 potential_numbers = self.get_potential_numbers(previous_answers)
-            filtered_numbers = [n for n in potential_numbers if n <= 100]
+            filtered_numbers = [n for n in potential_numbers if get_number(n) <= 100]
             if len(filtered_numbers) < 1:
                 metadata = {
                     "error": "Not enough numbers to compute not: {}".format(filtered_numbers)
@@ -338,7 +347,7 @@ class MathQuestionGenerator(QuestionGenerator):
                 return [], metadata
             else:
                 for number in filtered_numbers:
-                    questions.append("not(" + str(number) + ")")
+                    questions.append(self.make_predicate("not", [number])
             return questions, metadata
         return [], {}
 
@@ -365,8 +374,7 @@ class MathQuestionGenerator(QuestionGenerator):
                     "error": "Not enough bools to compute and"
                 }
                 return [], metadata
-            questions.append("and(" + self.yes_no(potential_bools[-2]) + ", " + self.yes_no(
-                potential_bools[-1]) + ")")
+            questions.append(self.make_predicate("and", [self.yes_no(p) for p in potential_bools[-2:]]))
             return questions, metadata
         return [], {}
 
@@ -396,10 +404,12 @@ class MathQuestionGenerator(QuestionGenerator):
             else:
                 entities = [e.replace(",", " ") for e in entities]
                 for pair in comparable_num_pairs + comparable_date_pairs:
-                    questions.append("if_then(" + str(pair[0]) + " > " + str(pair[1]) + ", " +
-                                     ", ".join(entities) + ")")
-                    questions.append("if_then(" + str(pair[1]) + " > " + str(pair[0]) + ", " +
-                                     ", ".join(entities) + ")")
+                    questions.append(
+                        self.make_predicate("if_then",
+                                            [str(pair[0]) + " > " + str(pair[1])] + entities))
+                    questions.append(
+                        self.make_predicate("if_then",
+                                            [str(pair[1]) + " > " + str(pair[0])] + entities))
             return questions, metadata
 
         # bool comparison
@@ -433,12 +443,15 @@ class MathQuestionGenerator(QuestionGenerator):
                 return [], metadata
             else:
                 entities = [e.replace(",", " ") for e in entities]
-                questions.append("if_then_bool(" + self.yes_no(potential_bools[-2]) +
-                                 " -> " + self.yes_no(potential_bools[-1]) + ", " +
-                                 entities[0] + ", " + entities[1] + ")")
-                questions.append("if_then_bool(" + self.yes_no(potential_bools[-2]) +
-                                 " -> " + self.yes_no(potential_bools[-1]) + ", " +
-                                 entities[1] + ", " + entities[0] + ")")
+                questions.append(
+                    self.make_predicate("if_then_bool",
+                                        [self.yes_no(potential_bools[-2]) +
+                                         " -> " + self.yes_no(potential_bools[-1])] + entities))
+                questions.append(
+                    self.make_predicate("if_then_bool",
+                                        [self.yes_no(potential_bools[-2]) +
+                                         " -> " + self.yes_no(potential_bools[-1])] +
+                                        list(reversed(entities))))
             return questions, metadata
 
         if "if_then_str" in qaconstraint.qconstraint.hints:
@@ -458,8 +471,9 @@ class MathQuestionGenerator(QuestionGenerator):
                 potential_strs = previous_answers[-2:]
             potential_strs = [e.replace(",", " ") for e in potential_strs]
             questions.append(
-                "if_then_str(" + str(potential_strs[-2]) + " != " + str(potential_strs[-1]) + ", " +
-                "no" + ", " + "yes" + ")")
+                self.make_predicate("if_then_str",
+                                    [str(potential_strs[-2]) + " != " + str(potential_strs[-1])] +
+                                    ["no", "yes"]))
             return questions, metadata
         return [], {}
 

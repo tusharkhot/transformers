@@ -2,7 +2,8 @@ import re
 
 from modularqa.con_gen.verifiers import LMSpansQuestionVerifier, LMQuestionVerifier
 from modularqa.inference.model_search import ParticipantModel
-from modularqa.utils.qa import LMQuestionAnswerer
+from modularqa.utils.classifier import LMClassifier
+from modularqa.utils.qa import LMQuestionAnswerer, BoolQuestionAnswerer
 from modularqa.utils.math_qa import MathQA
 
 class ModelRouter(ParticipantModel):
@@ -125,6 +126,44 @@ class MathQAParticipant(MathQA, ParticipantModel):
         answer = self.answer_question(question)
         if debug:
             print("<MathQA> Ans: {}".format(answer))
+        if answer == "":
+            return []
+        # copy state
+        new_state = state.copy()
+
+        ## TODO update score?
+
+        ## add answer
+        new_state._data["answer_seq"].append(answer)
+        new_state._data["command_seq"].append("qa")
+
+        ## change output
+        new_state.last_output = answer
+        new_state._next = "gen"
+
+        return [new_state]
+
+
+class BoolQAParticipant(BoolQuestionAnswerer, ParticipantModel):
+
+    def query(self, state, debug=False):
+        """The main function that interfaces with the overall search and
+        model controller, and manipulates the incoming data.
+
+        :param state: the state of controller and model flow.
+        :type state: launchpadqa.question_search.model_search.SearchState
+        :rtype: list
+        """
+        ## the data
+        data = state._data
+        question = data["question_seq"][-1]
+        qid = data["qid"]
+
+        ### run the model (as before)
+        if debug: print("<BOOLQ>: %s, qid=%s" % (question, qid))
+        answer = self.answer_question_only(question=question, qid=qid)
+        if debug:
+            print("<BOOLQ> Ans: {}".format(answer))
         if answer == "":
             return []
         # copy state

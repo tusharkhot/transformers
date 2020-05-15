@@ -5,6 +5,7 @@ from typing import List
 import numpy as np
 import torch
 
+from modularqa.utils.classifier import LMClassifier
 from modularqa.utils.str_utils import tokenize_question, tokenize_document, overlap_score
 from transformers import AutoConfig, AutoTokenizer, AutoModelForQuestionAnswering
 from transformers import SquadV2Processor, squad_convert_examples_to_features
@@ -22,6 +23,54 @@ class QAAnswer(object):
 
     def __str__(self):
         return "Ans:{} Score:{} Para:{}".format(self.answer, self.score, self.para_text)
+
+
+class BoolQuestionAnswerer:
+    def __init__(self, hotpotqa_file=None, drop_file=None, only_gold_para=False, **kwargs):
+        if hotpotqa_file is not None:
+            self._qid_doc_map = get_qid_doc_map_hotpotqa(hotpotqa_file,
+                                                         only_gold_para=only_gold_para)
+        elif drop_file is not None:
+            self._qid_doc_map = get_qid_doc_map_drop(drop_file)
+        else:
+            self._qid_doc_map = None
+        self.classifier = LMClassifier(**kwargs)
+
+    def answer_question(self, question: str, paragraphs: List[str]):
+        # check if any paragraph returns a yes
+        best_score = -1
+        best_para = None
+        best_label = "no"
+        for p in paragraphs:
+            distr = self.classifier.score_sequence(question, p)
+            if distr[0] > distr[1]:
+                score = distr[0]
+                label = "no"
+            else:
+                score = distr[1]
+                label = "yes"
+                if best_label != "yes":
+                    best_label = "yes"
+                    best_score = score
+                    best_para = p
+            # check for improvement in score if this label matches the current best label
+            if score > best_score and label == best_label:
+                best_score = score
+                best_para = p
+        return QAAnswer(answer_text=best_label, score=best_score, para_text=best_para)
+
+    def answer_question_only(self, question: str, qid: str):
+        if self._qid_doc_map is None:
+            raise ValueError("QA model should be constructed with an input HotPotQA/DROP file"
+                             " to load qid -> doc map")
+        else:
+            if qid not in self._qid_doc_map:
+                raise ValueError("QID: {} not found in the qid->doc map loaded.".format(qid))
+            else:
+                doc_map = self._qid_doc_map[qid]
+                # ignore title as it is not present in SQuAD models
+                paragraphs = [" ".join(doc) for (t, doc) in doc_map.items()]
+                return self.answer_question(question, paragraphs)
 
 
 class LMQuestionAnswerer:
@@ -44,9 +93,9 @@ class LMQuestionAnswerer:
         self.return_all_ans = return_all_ans
         # if para_file is passed, load the documents from this file
         if hotpotqa_file is not None:
-            self._qid_doc_map = self.get_qid_doc_map_hotpotqa(hotpotqa_file, only_gold_para)
+            self._qid_doc_map = get_qid_doc_map_hotpotqa(hotpotqa_file, only_gold_para)
         elif drop_file is not None:
-            self._qid_doc_map = self.get_qid_doc_map_drop(drop_file)
+            self._qid_doc_map = get_qid_doc_map_drop(drop_file)
         else:
             self._qid_doc_map = None
 
@@ -107,36 +156,36 @@ class LMQuestionAnswerer:
                 paragraphs = [" ".join(doc) for (t, doc) in doc_map.items()]
                 return self.answer_question(question, paragraphs, normalize=normalize)
 
-    def get_qid_doc_map_hotpotqa(self, para_file, only_gold_para):
-        print("Loading paragraphs from {}".format(para_file))
-        with open(para_file, "r") as input_fp:
-            input_json = json.load(input_fp)
-        qid_doc_map = {}
-        for entry in input_json:
-            supporting_docs = {doc for (doc, idx) in entry["supporting_facts"]}
-            title_doc_map = {}
-            qid = entry["_id"]
-            for title, document in entry["context"]:
-                if not only_gold_para or title in supporting_docs:
-                    title_doc_map[title] = [doc.strip() for doc in document]
+def get_qid_doc_map_hotpotqa(para_file, only_gold_para):
+    print("Loading paragraphs from {}".format(para_file))
+    with open(para_file, "r") as input_fp:
+        input_json = json.load(input_fp)
+    qid_doc_map = {}
+    for entry in input_json:
+        supporting_docs = {doc for (doc, idx) in entry["supporting_facts"]}
+        title_doc_map = {}
+        qid = entry["_id"]
+        for title, document in entry["context"]:
+            if not only_gold_para or title in supporting_docs:
+                title_doc_map[title] = [doc.strip() for doc in document]
 
+        qid_doc_map[qid] = title_doc_map
+
+    return qid_doc_map
+
+def get_qid_doc_map_drop(drop_file):
+    print("Loading paragraphs from {}".format(drop_file))
+    with open(drop_file, "r") as input_fp:
+        input_json = json.load(input_fp)
+    qid_doc_map = {}
+    for paraid, item in input_json.items():
+        para = item["passage"]
+        title_doc_map = {paraid: [para]}
+        for qa_pair in item["qa_pairs"]:
+            qid = qa_pair["query_id"]
             qid_doc_map[qid] = title_doc_map
 
-        return qid_doc_map
-
-    def get_qid_doc_map_drop(self, drop_file):
-        print("Loading paragraphs from {}".format(drop_file))
-        with open(drop_file, "r") as input_fp:
-            input_json = json.load(input_fp)
-        qid_doc_map = {}
-        for paraid, item in input_json.items():
-            para = item["passage"]
-            title_doc_map = {paraid: [para]}
-            for qa_pair in item["qa_pairs"]:
-                qid = qa_pair["query_id"]
-                qid_doc_map[qid] = title_doc_map
-
-        return qid_doc_map
+    return qid_doc_map
 
 
 def answer_question(question: str,

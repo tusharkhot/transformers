@@ -24,7 +24,7 @@ class MathQA:
         try:
             date1_datetime = parse(date1)
             date2_datetime = parse(date2)
-        except ValueError:
+        except Exception:
             # couldn't parse date
             return None
         curr_date = datetime.now()

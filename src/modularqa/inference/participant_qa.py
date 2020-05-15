@@ -1,4 +1,5 @@
 import re
+import string
 
 from modularqa.con_gen.verifiers import LMSpansQuestionVerifier, LMQuestionVerifier
 from modularqa.inference.model_search import ParticipantModel
@@ -86,15 +87,16 @@ class LMQAParticipant(LMQuestionAnswerer, ParticipantModel):
 
             ## add score
             # new_state._score += bert_out.score
-            ## add answer
-            new_state._data["answer_seq"].append(bert_out.answer)
+            ## strip unnecessary punctuations
+            answer = bert_out.answer.strip(string.punctuation)
+            new_state._data["answer_seq"].append(answer)
 
             ## add initial question + answer as tuple to `question_seq`
             # new_state._data["question_seq"][-1] = (question, bert_out.answer)
             new_state._data["command_seq"].append("qa")
 
             ## change output
-            new_state.last_output = bert_out.answer
+            new_state.last_output = answer
 
             ## determine next state based on
             if len(new_state._data["answer_seq"]) >= max_answers:
@@ -161,22 +163,22 @@ class BoolQAParticipant(BoolQuestionAnswerer, ParticipantModel):
 
         ### run the model (as before)
         if debug: print("<BOOLQ>: %s, qid=%s" % (question, qid))
-        answer = self.answer_question_only(question=question, qid=qid)
+        model_answer = self.answer_question_only(question=question, qid=qid)
         if debug:
-            print("<BOOLQ> Ans: {}".format(answer))
-        if answer == "":
-            return []
+            print("<BOOLQ> Ans: {} Score: {} Para: {}".format(model_answer.answer,
+                                                              model_answer.score,
+                                                              model_answer.para_text[:15]))
         # copy state
         new_state = state.copy()
 
         ## TODO update score?
 
         ## add answer
-        new_state._data["answer_seq"].append(answer)
+        new_state._data["answer_seq"].append(model_answer.answer)
         new_state._data["command_seq"].append("qa")
 
         ## change output
-        new_state.last_output = answer
+        new_state.last_output = model_answer.answer
         new_state._next = "gen"
 
         return [new_state]

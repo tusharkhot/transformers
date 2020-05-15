@@ -5,6 +5,7 @@ from modularqa.con_gen.constants import LIST_JOINER
 
 
 def get_bool(answer: str) -> bool:
+    answer = answer.strip()
     if answer == "yes" or answer == "1" or answer.lower() == "true":
         return True
     return False

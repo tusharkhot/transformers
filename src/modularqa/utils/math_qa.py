@@ -64,7 +64,7 @@ class MathQA:
         if m is None:
             print("Can not parse question: {}".format(question))
             return ""
-        input_answer = m.group(1)
+        input_answer = m.group(1).strip()
         if input_answer == "":
             pred_length = 0
         else:
@@ -73,7 +73,7 @@ class MathQA:
         return str(pred_length)
 
     def answer_and_q(self, question: str) -> str:
-        m = re.match("and\((.*), (.*)\)", question)
+        m = re.match("and\((.*),(.*)\)", question)
         if m is None:
             print("Can not parse question: {}".format(question))
             return ""
@@ -88,16 +88,16 @@ class MathQA:
             return "no"
 
     def answer_diff_q(self, question: str) -> str:
-        m = re.match("diff\(([^,]*), ([^,]*)\)", question)
+        m = re.match("diff\(([^,]*),([^,]*)\)", question)
         if m is None:
-            m = re.match("diff\(([^,]*), ([^,]*), ([^,]*)\)", question)
+            m = re.match("diff\(([^,]*),([^,]*),([^,]*)\)", question)
             if m is None:
                 print("Can not parse question: {}".format(question))
                 return ""
             else:
-                date1 = m.group(1)
-                date2 = m.group(2)
-                units = m.group(3)
+                date1 = m.group(1).strip()
+                date2 = m.group(2).strip()
+                units = m.group(3).strip()
                 date_diff = MathQA.date_difference(date1, date2, units)
                 if date_diff is not None:
                     pred_val = abs(date_diff)
@@ -121,7 +121,7 @@ class MathQA:
         return str(pred_val)
 
     def answer_ifthen_q(self, question: str) -> str:
-        m = re.match("if_then\((.*) ([<>]) (.*), (.*), (.*)\)", question)
+        m = re.match("if_then\((.*)([<>])(.*),(.*),(.*)\)", question)
         if m is None:
             print("Can not parse question: {}".format(question))
             return ""
@@ -138,8 +138,8 @@ class MathQA:
                 diff_val = date_diff
         else:
             diff_val = num1 - num2
-        ent1 = m.group(4)
-        ent2 = m.group(5)
+        ent1 = m.group(4).strip()
+        ent2 = m.group(5).strip()
         if (op == ">" and diff_val > 0) or (op == "<" and diff_val < 0):
             pred_ans = ent1
         else:
@@ -147,7 +147,7 @@ class MathQA:
         return pred_ans
 
     def answer_ifthen_bool_q(self, question: str) -> str:
-        m = re.match("if_then_bool\((.*) -> (.*), (.*), (.*)\)", question)
+        m = re.match("if_then_bool\((.*)->(.*),(.*),(.*)\)", question)
         if m is None:
             print("Can not parse question: {}".format(question))
             return ""
@@ -156,8 +156,8 @@ class MathQA:
         if num1 is None or num2 is None or num1 == num2:
             print("Can not parse question: {}".format(question))
             return ""
-        ent1 = m.group(3)
-        ent2 = m.group(4)
+        ent1 = m.group(3).strip()
+        ent2 = m.group(4).strip()
         if num1:
             pred_ans = ent1
         else:
@@ -166,17 +166,17 @@ class MathQA:
 
 
     def answer_ifthen_str_q(self, question: str) -> str:
-        m = re.match("if_then_str\((.*) != (.*), (.*), (.*)\)", question)
+        m = re.match("if_then_str\((.*)!=(.*),(.*),(.*)\)", question)
         if m is None:
             print("Can not parse question: {}".format(question))
             return ""
-        str1 = m.group(1)
-        str2 = m.group(2)
+        str1 = m.group(1).strip()
+        str2 = m.group(2).strip()
         if str1 == "" or str2 == "":
             print("Can not parse question: {}".format(question))
             return ""
-        ent1 = m.group(3)
-        ent2 = m.group(4)
+        ent1 = m.group(3).strip()
+        ent2 = m.group(4).strip()
         if str1 != str2:
             pred_ans = ent1
         else:

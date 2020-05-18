@@ -44,7 +44,7 @@ def create_labelled_chains(output_json, generator_verifiers,
     qid = output_json["id"]
     observed_sequences = set()
     for idx, constraint in enumerate(qaconstraints):
-        if constraint.model == "FAILED":
+        if constraint.model == "FAILED" or constraint.model == "OUTOFSCOPE":
             return positive_chains, negative_chains
         newq_chains = []
         newa_chains = []

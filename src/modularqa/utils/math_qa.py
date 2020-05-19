@@ -48,8 +48,8 @@ class MathQA:
             return relativedelta(date1_datetime, date2_datetime).months
         if units == "years":
             return relativedelta(date1_datetime, date2_datetime).years
-        raise ValueError("Unknown unit:" + units)
-
+        print("Unknown unit:" + units)
+        return None
 
     def answer_question(self, question: str) -> str:
         for operation, func in self.valid_operation_func.items():

@@ -75,7 +75,7 @@ class BoolQuestionAnswerer:
                                  " to load qid -> doc map")
             else:
                 paragraphs = search_es(es=self._es, es_index=self._es_index, question=question,
-                                       num_es_hits=10)
+                                       num_es_hits=5)
                 return self.answer_question_only(question, paragraphs)
         else:
             if qid not in self._qid_doc_map:
@@ -165,8 +165,13 @@ class LMQuestionAnswerer:
         :return: answer
         """
         if self._qid_doc_map is None:
-            raise ValueError("QA model should be constructed with an input HotPotQA/DROP file"
-                             " to load qid -> doc map")
+            if self._es is None:
+                raise ValueError("QA model should be constructed with an input HotPotQA/DROP file"
+                                 " to load qid -> doc map")
+            else:
+                paragraphs = search_es(es=self._es, es_index=self._es_index, question=question,
+                                       num_es_hits=5)
+                return self.answer_question_only(question, paragraphs)
         else:
             if qid not in self._qid_doc_map:
                 raise ValueError("QID: {} not found in the qid->doc map loaded.".format(qid))

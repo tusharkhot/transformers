@@ -4,6 +4,7 @@ from typing import List
 
 import numpy as np
 import torch
+from elasticsearch import Elasticsearch
 
 from modularqa.utils.classifier import LMClassifier
 from modularqa.utils.str_utils import tokenize_question, tokenize_document, overlap_score
@@ -26,7 +27,9 @@ class QAAnswer(object):
 
 
 class BoolQuestionAnswerer:
-    def __init__(self, hotpotqa_file=None, drop_file=None, only_gold_para=False, **kwargs):
+    def __init__(self, hotpotqa_file=None, drop_file=None, only_gold_para=False,
+                 es_host=None, es_index="hpqa_para",
+                 **kwargs):
         if hotpotqa_file is not None:
             self._qid_doc_map = get_qid_doc_map_hotpotqa(hotpotqa_file,
                                                          only_gold_para=only_gold_para)
@@ -34,6 +37,12 @@ class BoolQuestionAnswerer:
             self._qid_doc_map = get_qid_doc_map_drop(drop_file)
         else:
             self._qid_doc_map = None
+
+        if es_host is not None:
+            self._es = Elasticsearch([es_host], retries=3, timeout=180)
+            self._es_index = es_index
+        else:
+            self._es = None
         self.classifier = LMClassifier(**kwargs)
 
     def answer_question(self, question: str, paragraphs: List[str]):
@@ -61,8 +70,13 @@ class BoolQuestionAnswerer:
 
     def answer_question_only(self, question: str, qid: str):
         if self._qid_doc_map is None:
-            raise ValueError("QA model should be constructed with an input HotPotQA/DROP file"
-                             " to load qid -> doc map")
+            if self._es is None:
+                raise ValueError("QA model should be constructed with an input HotPotQA/DROP file"
+                                 " to load qid -> doc map")
+            else:
+                paragraphs = search_es(es=self._es, es_index=self._es_index, question=question,
+                                       num_es_hits=10)
+                return self.answer_question_only(question, paragraphs)
         else:
             if qid not in self._qid_doc_map:
                 raise ValueError("QID: {} not found in the qid->doc map loaded.".format(qid))
@@ -78,6 +92,7 @@ class LMQuestionAnswerer:
 
     def __init__(self, model_path, model_type=None,
                  hotpotqa_file=None, drop_file=None, only_gold_para=False, return_all_ans=False,
+                 es_host=None, es_index="hpqa_para",
                  seq_length=512, num_ans_para=1, single_para=False, merge_select_para=False,
                  return_unique_list=False):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -98,6 +113,11 @@ class LMQuestionAnswerer:
             self._qid_doc_map = get_qid_doc_map_drop(drop_file)
         else:
             self._qid_doc_map = None
+        if es_host is not None:
+            self._es = Elasticsearch([es_host], retries=3, timeout=180)
+            self._es_index = es_index
+        else:
+            self._es = None
 
     @staticmethod
     def load_model_tokenizer(model_path, device):
@@ -155,6 +175,36 @@ class LMQuestionAnswerer:
                 # ignore title as it is not present in SQuAD models
                 paragraphs = [" ".join(doc) for (t, doc) in doc_map.items()]
                 return self.answer_question(question, paragraphs, normalize=normalize)
+
+
+def search_es(es, es_index, question, num_es_hits):
+    body = {
+        "from": 0,
+        "size": num_es_hits,
+        "query": {
+            "bool": {
+                "must": [
+                    {"match": {
+                        "para": question
+                    }}
+                ],
+                "filter": [
+                    {"type": {"value": "sentence"}}
+                ]
+            }
+        }
+    }
+    res = es.search(index=es_index,
+                          body=body,
+                          search_type="dfs_query_then_fetch")
+    if res["timed_out"]:
+        raise ValueError("ElasticSearch timed out!!")
+    hits = []
+    for idx, es_hit in enumerate(res['hits']['hits']):
+        hit_text = es_hit["_source"]["para"].strip()
+        hits.append(hit_text)
+    return hits
+
 
 def get_qid_doc_map_hotpotqa(para_file, only_gold_para):
     print("Loading paragraphs from {}".format(para_file))

@@ -46,6 +46,7 @@ RUN python3 -m pip install --no-cache-dir \
     tensorboard
 
 RUN python3 -m pip install --no-cache-dir sklearn
+RUN python3 -m pip install --no-cache-dir elasticsearch
 
 COPY README.md .
 COPY setup.py .
@@ -54,10 +55,6 @@ COPY src/transformers src/transformers
 RUN python3 -m pip install --no-cache-dir .
 COPY src/modularqa src/modularqa
 COPY examples/ examples/
-
-
-
-
 
 LABEL maintainer="tushark@allenai.org"
 

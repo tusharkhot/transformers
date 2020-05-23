@@ -76,7 +76,7 @@ class BoolQuestionAnswerer:
             else:
                 paragraphs = search_es(es=self._es, es_index=self._es_index, question=question,
                                        num_es_hits=5)
-                return self.answer_question_only(question, paragraphs)
+                return self.answer_question(question, paragraphs)
         else:
             if qid not in self._qid_doc_map:
                 raise ValueError("QID: {} not found in the qid->doc map loaded.".format(qid))
@@ -171,7 +171,7 @@ class LMQuestionAnswerer:
             else:
                 paragraphs = search_es(es=self._es, es_index=self._es_index, question=question,
                                        num_es_hits=5)
-                return self.answer_question_only(question, paragraphs)
+                return self.answer_question(question, paragraphs)
         else:
             if qid not in self._qid_doc_map:
                 raise ValueError("QID: {} not found in the qid->doc map loaded.".format(qid))

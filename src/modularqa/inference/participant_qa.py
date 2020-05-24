@@ -13,7 +13,7 @@ class ModelRouter(ParticipantModel):
         if question_pattern:
             self.question_pattern = re.compile(question_pattern)
         else:
-            self.question_pattern = re.compile("^\(([^\)]+)\) (.*)$")
+            self.question_pattern = re.compile("^\(([^\)]+)\)(.*)$")
 
     def query(self, state, debug=False):
         data = state._data
@@ -26,7 +26,7 @@ class ModelRouter(ParticipantModel):
         m = self.question_pattern.match(question)
         if m:
             send_to = m.group(1)
-            new_q = m.group(2)
+            new_q = m.group(2).strip()
             if debug: print("<ROUTE>: %s, qid=%s, route=%s" % (new_q, qid, send_to))
 
             new_state._data["model_seq"].append(send_to)
@@ -50,6 +50,10 @@ class LMQAParticipant(LMQuestionAnswerer, ParticipantModel):
     in the controller.
     """
 
+    def __init__(self, max_answers=1, **kwargs):
+        self.max_answers = max_answers
+        super(LMQAParticipant, self).__init__(**kwargs)
+
     def query(self, state, debug=False):
         """The main function that interfaces with the overall search and
         model controller, and manipulates the incoming data.
@@ -69,7 +73,7 @@ class LMQAParticipant(LMQuestionAnswerer, ParticipantModel):
 
         ### run the model (as before)
         if debug: print("<BERTQA>: %s, qid=%s" % (question, qid))
-        model_output = self.answer_question_only(question, qid)[:1]
+        model_output = self.answer_question_only(question, qid)[:self.max_answers]
 
         ## will deteremine stopping condition
         max_answers = 4
@@ -90,6 +94,7 @@ class LMQAParticipant(LMQuestionAnswerer, ParticipantModel):
             ## strip unnecessary punctuations
             answer = bert_out.answer.strip(string.punctuation)
             new_state._data["answer_seq"].append(answer)
+            new_state._data["para_seq"].append(bert_out.para_text)
 
             ## add initial question + answer as tuple to `question_seq`
             # new_state._data["question_seq"][-1] = (question, bert_out.answer)
@@ -137,6 +142,7 @@ class MathQAParticipant(MathQA, ParticipantModel):
 
         ## add answer
         new_state._data["answer_seq"].append(answer)
+        new_state._data["para_seq"].append("")
         new_state._data["command_seq"].append("qa")
 
         ## change output
@@ -175,6 +181,7 @@ class BoolQAParticipant(BoolQuestionAnswerer, ParticipantModel):
 
         ## add answer
         new_state._data["answer_seq"].append(model_answer.answer)
+        new_state._data["para_seq"].append(model_answer.para_text)
         new_state._data["command_seq"].append("qa")
 
         ## change output

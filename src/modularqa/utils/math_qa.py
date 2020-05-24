@@ -47,7 +47,8 @@ class MathQA:
         if units == "months":
             return relativedelta(date1_datetime, date2_datetime).months
         if units == "years":
-            return relativedelta(date1_datetime, date2_datetime).years
+            # human annotations are often on just the year value
+            return date1_datetime.year - date2_datetime.year
         print("Unknown unit:" + units)
         return None
 

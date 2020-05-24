@@ -409,7 +409,7 @@ class MathQuestionGenerator(QuestionGenerator):
                                             [str(pair[0]) + " > " + str(pair[1])] + entities))
                     questions.append(
                         self.make_predicate("if_then",
-                                            [str(pair[1]) + " > " + str(pair[0])] + entities))
+                                            [str(pair[0]) + " < " + str(pair[1])] + entities))
             return questions, metadata
 
         # bool comparison

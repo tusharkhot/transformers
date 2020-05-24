@@ -1,3 +1,4 @@
+import re
 import string
 from datetime import datetime
 from typing import List, Tuple, Dict, Any, Optional
@@ -282,6 +283,16 @@ class BoolQuestionVerifier(QuestionVerifier):
         selected_answers = []
         metadata = {"scored_questions": []}
         for question in questions:
+            if re.search("\Wsame\W", question):
+                # ignore questions with same
+                metadata["scored_questions"].append({
+                    "q": question,
+                    "a": exp_answer,
+                    "as": 0,
+                    "error": "Question with 'same' ignored as they are never relevant."
+                })
+                continue
+
             key = question + "$$" + qaconstraint.context
             if key in self.question_answers:
                 scores = self.question_answers[key]

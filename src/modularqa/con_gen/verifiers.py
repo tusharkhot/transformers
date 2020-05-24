@@ -282,6 +282,8 @@ class BoolQuestionVerifier(QuestionVerifier):
         selected_questions = []
         selected_answers = []
         metadata = {"scored_questions": []}
+        exp_answer = qaconstraint.aconstraint.exp_ans
+
         for question in questions:
             if re.search("\Wsame\W", question):
                 # ignore questions with same
@@ -306,8 +308,6 @@ class BoolQuestionVerifier(QuestionVerifier):
             else:
                 answer = "yes"
 
-
-            exp_answer = qaconstraint.aconstraint.exp_ans
             if exp_answer is not None:
                 if exp_answer == answer:
                     answer_score = 1

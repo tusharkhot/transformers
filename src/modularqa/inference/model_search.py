@@ -27,7 +27,8 @@ class QuestionGeneratorData(BasicDataInstance):
         "question_seq",
         "answer_seq",
         "command_seq",
-        "model_seq"
+        "model_seq",
+        "para_seq"
     ])
 
 

@@ -1,0 +1,29 @@
+{
+  "start_state": "gen",
+  "end_state": "EOQ",
+  "models": {
+    "gen": {
+      "name": "lmgen",
+      "model_path": "/gpt2_qsimp/",
+      "length": 40,
+      "num_samples": 5
+    },
+    "qa": {
+      "name": "model_router"
+    },
+    "squad": {
+      "name": "lmqa",
+      "model_path": "/qa_bert/",
+      "single_para": false,
+      "hotpotqa_file": "/input/hotpot_train_v1.1.json",
+      "num_ans_para": 1
+    },
+    "qal":  {
+      "name": "qual_overlap",
+      "dump_chains": "/output/chains.tsv"
+    },
+    "math": {
+      "name": "mathqa"
+    }
+  }
+}

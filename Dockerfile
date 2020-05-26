@@ -47,6 +47,7 @@ RUN python3 -m pip install --no-cache-dir \
 
 RUN python3 -m pip install --no-cache-dir sklearn
 RUN python3 -m pip install --no-cache-dir elasticsearch
+RUN python3 -m pip install --no-cache-dir word2number
 
 COPY README.md .
 COPY setup.py .

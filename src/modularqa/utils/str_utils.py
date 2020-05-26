@@ -5,7 +5,6 @@ from nltk.corpus import stopwords
 from nltk.stem.porter import PorterStemmer
 import string
 
-from modularqa.drop.drop_utils import get_number
 
 stemmer = PorterStemmer()
 
@@ -38,6 +37,7 @@ def tokenize_document(para):
 
 
 def tokenize_question(question):
+    from modularqa.drop.drop_utils import get_number
     m = re.match("\s*\([^\(]+\)\s*(.+)", question)
     if m:
         question = m.group(1)

@@ -2,7 +2,7 @@ import re
 
 from dateutil.relativedelta import relativedelta
 
-from modularqa.drop.drop_utils import get_subspans, get_number, get_bool
+from modularqa.drop.drop_utils import get_subspans, get_number, get_bool, parse_number
 from dateutil.parser import parse
 from datetime import datetime
 
@@ -43,7 +43,7 @@ class MathQA:
             date2_datetime = date2_datetime.replace(year=date1_datetime.year)
 
         if units == "days":
-            return relativedelta(date1_datetime, date2_datetime).days
+            return (date1_datetime-date2_datetime).days
         if units == "months":
             return relativedelta(date1_datetime, date2_datetime).months
         if units == "years":
@@ -106,10 +106,9 @@ class MathQA:
                     print("Can not parse question: {}".format(question))
                     return ""
         else:
-            num1 = get_number(m.group(1))
-            num2 = get_number(m.group(2))
+            num1 = parse_number(m.group(1))
+            num2 = parse_number(m.group(2))
             if num1 is None or num2 is None:
-                # try date with no units
                 date_diff = MathQA.date_difference(m.group(1), m.group(2))
                 if date_diff is None:
                     print("Can not parse question: {}".format(question))
@@ -126,9 +125,9 @@ class MathQA:
         if m is None:
             print("Can not parse question: {}".format(question))
             return ""
-        num1 = get_number(m.group(1))
+        num1 = parse_number(m.group(1))
         op = m.group(2)
-        num2 = get_number(m.group(3))
+        num2 = parse_number(m.group(3))
         if num1 is None or num2 is None:
             # try date with the smallest unit
             date_diff = MathQA.date_difference(m.group(1), m.group(3), "days")
@@ -207,11 +206,22 @@ if __name__ == '__main__':
     answer = math_qa.answer_question(question)
     print("Q: {} \n A: {}".format(question, answer))
 
+    question = "diff(25.0 million, 17 thousand)"
+    answer = math_qa.answer_question(question)
+    print("Q: {} \n A: {}".format(question, answer))
+
 
     question = "diff(Jun 2 2011, 3rd Aug, days)"
     answer = math_qa.answer_question(question)
     print("Q: {} \n A: {}".format(question, answer))
 
+    question = "diff(7 May 1487, 18 August 1487, days)"
+    answer = math_qa.answer_question(question)
+    print("Q: {} \n A: {}".format(question, answer))
+
+    question = "diff(29 August 1942, 1 April 1943, months)"
+    answer = math_qa.answer_question(question)
+    print("Q: {} \n A: {}".format(question, answer))
 
     question = "if_then(23 > 15, Obama, Biden)"
     answer = math_qa.answer_question(question)

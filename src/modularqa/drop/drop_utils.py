@@ -84,7 +84,8 @@ def parse_number(word: str):
                                       normalized_tokens=tokens, token_index=tokidx)
         if nums is not None:
             if isinstance(nums, list):
-                return nums[0]
+                if len(nums):
+                    return nums[0]
             else:
                 return nums
     return None

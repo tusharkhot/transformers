@@ -18,8 +18,9 @@ class LMGenerator():
                  model_type=None,
                  length=30,
                  num_samples=20,
-                 top_p=0.9,
-                 top_k=0,
+                 top_p=None,
+                 top_k=None,
+                 num_beams=None,
                  temperature=1.0):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         ## set up the model
@@ -31,6 +32,7 @@ class LMGenerator():
         self.top_p = top_p
         self.top_k = top_k
         self.temperature = temperature
+        self.num_beams = num_beams
 
     def generate_sequences(self, sequence, num_samples=None):
         if num_samples is None:
@@ -41,6 +43,7 @@ class LMGenerator():
                                          num_samples=num_samples,
                                          temperature=self.temperature,
                                          top_k=self.top_k, top_p=self.top_p,
+                                         num_beams=self.num_beams,
                                          tokenizer=self.tokenizer, device=self.device)
 
         return outputs
@@ -72,8 +75,8 @@ class LMGenerator():
 
 
 def generate_text_sequence(model, tokenizer, model_type, prompt_text, device,
-                           length=30, num_samples=1, temperature=1, top_k=0,
-                           top_p=0.0, stop_token=None):
+                           length=30, num_samples=1, temperature=1, top_k=None, num_beams=None,
+                           top_p=None, stop_token=None):
     # Different models need different input formatting and/or extra arguments
     requires_preprocessing = model_type in PREPROCESSING_FUNCTIONS.keys()
     if requires_preprocessing:
@@ -94,6 +97,7 @@ def generate_text_sequence(model, tokenizer, model_type, prompt_text, device,
         top_k=top_k,
         top_p=top_p,
         do_sample=True,
+        num_beams=num_beams, no_repeat_ngram_size=3,
         num_return_sequences=num_samples,
         decoder_start_token_id=model.config.decoder_start_token_id,
         pad_token_id=model.config.pad_token_id or model.config.eos_token_id

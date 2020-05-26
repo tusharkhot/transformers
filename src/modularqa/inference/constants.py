@@ -5,17 +5,18 @@ from modularqa.inference.participant_qa import LMQAParticipant, MathQAParticipan
     ModelRouter, BoolQAParticipant
 from modularqa.inference.participant_qgen import LMGenParticipant
 from modularqa.inference.quality_checkers import QualityCheckerExample, ChainOverlapScorer, \
-    LMQualityChecker
+    LMQualityChecker, LMQualityOverlapChecker
 
 MODEL_NAME_CLASS = {
     "lmgen": LMGenParticipant,
     "lmqa": LMQAParticipant,
     "qual_example": QualityCheckerExample,
     "qual_overlap": ChainOverlapScorer,
+    "qual_lm": LMQualityChecker,
+    "qual_overlap_lm": LMQualityOverlapChecker,
     "mathqa": MathQAParticipant,
     "boolqa": BoolQAParticipant,
-    "model_router": ModelRouter,
-    "qual_lm": LMQualityChecker
+    "model_router": ModelRouter
 }
 
 READER_NAME_CLASS: Dict[str, DatasetReader] = {

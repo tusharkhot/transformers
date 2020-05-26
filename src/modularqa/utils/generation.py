@@ -18,7 +18,7 @@ class LMGenerator():
                  model_type=None,
                  length=30,
                  num_samples=20,
-                 top_p=None,
+                 top_p=0.9,
                  top_k=None,
                  num_beams=None,
                  temperature=1.0):

@@ -67,7 +67,11 @@ class ChainOverlapScorer(ParticipantModel):
                 sequence = get_sequence_representation(origq, qchain, achain, mchain,
                                                        for_generation=False)
                 with open(self.dump_chains, 'a') as chains_fp:
-                    chains_fp.write(data["qid"] + "\t" + sequence + "\t" + achain[-1] + "\t" +
+                    if len(achain) == 0:
+                        ans = ""
+                    else:
+                        ans = achain[-1]
+                    chains_fp.write(data["qid"] + "\t" + sequence + "\t" + ans + "\t" +
                                     "  ".join(data.get("para_seq")) + "\n")
             if unmatched_answers > 0:
                 if debug:

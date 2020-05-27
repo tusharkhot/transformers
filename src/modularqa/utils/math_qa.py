@@ -227,6 +227,10 @@ if __name__ == '__main__':
     answer = math_qa.answer_question(question)
     print("Q: {} \n A: {}".format(question, answer))
 
+    question = "if_then(July 1918 > 1918, Obama, Biden)"
+    answer = math_qa.answer_question(question)
+    print("Q: {} \n A: {}".format(question, answer))
+
     question = "not(.4)"
     answer = math_qa.answer_question(question)
     print("Q: {} \n A: {}".format(question, answer))

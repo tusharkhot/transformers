@@ -108,16 +108,16 @@ class MathQA:
         else:
             num1 = parse_number(m.group(1))
             num2 = parse_number(m.group(2))
-            if num1 is None or num2 is None:
-                date_diff = MathQA.date_difference(m.group(1), m.group(2))
-                if date_diff is None:
-                    print("Can not parse question: {}".format(question))
-                    return ""
-                else:
-                    pred_val = abs(date_diff)
-            else:
+            date_diff = MathQA.date_difference(m.group(1), m.group(2))
+            if date_diff is not None:
+                pred_val = abs(date_diff)
+            elif num1 is not None and num2 is not None:
                 # never asks for negative difference
                 pred_val = abs(num1 - num2)
+            else:
+                print("Can not parse question: {}".format(question))
+                return ""
+
         return str(pred_val)
 
     def answer_ifthen_q(self, question: str) -> str:
@@ -128,16 +128,15 @@ class MathQA:
         num1 = parse_number(m.group(1))
         op = m.group(2)
         num2 = parse_number(m.group(3))
-        if num1 is None or num2 is None:
-            # try date with the smallest unit
-            date_diff = MathQA.date_difference(m.group(1), m.group(3), "days")
-            if date_diff is None:
-                print("Can not parse question: {}".format(question))
-                return ""
-            else:
-                diff_val = date_diff
-        else:
+        # try date with the smallest unit
+        date_diff = MathQA.date_difference(m.group(1), m.group(3), "days")
+        if date_diff is not None:
+            diff_val = date_diff
+        elif num1 is not None and num2 is not None:
             diff_val = num1 - num2
+        else:
+            print("Can not parse question: {}".format(question))
+            return ""
         ent1 = m.group(4).strip()
         ent2 = m.group(5).strip()
         if (op == ">" and diff_val > 0) or (op == "<" and diff_val < 0):
@@ -210,6 +209,9 @@ if __name__ == '__main__':
     answer = math_qa.answer_question(question)
     print("Q: {} \n A: {}".format(question, answer))
 
+    question = "diff(7 May 1487, 18 August 1487)"
+    answer = math_qa.answer_question(question)
+    print("Q: {} \n A: {}".format(question, answer))
 
     question = "diff(Jun 2 2011, 3rd Aug, days)"
     answer = math_qa.answer_question(question)
@@ -232,5 +234,11 @@ if __name__ == '__main__':
     print("Q: {} \n A: {}".format(question, answer))
 
     question = "not(.4)"
+    answer = math_qa.answer_question(question)
+    print("Q: {} \n A: {}".format(question, answer))
+
+    question = "if_then(February 2008 < 6 March 2008," \
+               " the election of Demetris Christofias as President," \
+               " Garoyian becoming Speaker of the House of Representatives)"
     answer = math_qa.answer_question(question)
     print("Q: {} \n A: {}".format(question, answer))

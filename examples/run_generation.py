@@ -167,7 +167,7 @@ def main():
         required=True,
         help="Path to pre-trained model or shortcut name selected in the list: " + ", ".join(MODEL_CLASSES.keys()),
     )
-
+    parser.add_argument("--add_bos", action="store_true", help="Add an extra BOS token in conditional text generation")
     parser.add_argument("--prompt", type=str, default="")
     parser.add_argument("--infile", type=str, default="")
     parser.add_argument("--outfile", type=str, default="")
@@ -246,6 +246,8 @@ def main():
             )
         else:
             encoded_prompt = tokenizer.encode(prompt_text, add_special_tokens=False, return_tensors="pt")
+        if args.add_bos:
+            encoded_prompt = [tokenizer.bos_token_id] + encoded_prompt
         encoded_prompt = encoded_prompt.to(args.device)
         if model.config.is_encoder_decoder:
             max_len = args.length
@@ -272,6 +274,8 @@ def main():
         for generated_sequence_idx, generated_sequence in enumerate(output_sequences):
             generated_sequence = generated_sequence.tolist()
             if model.config.is_encoder_decoder:
+                generated_sequence = generated_sequence[1:]
+            if args.add_bos:
                 generated_sequence = generated_sequence[1:]
             # Decode text
             text = tokenizer.decode(generated_sequence, clean_up_tokenization_spaces=True)

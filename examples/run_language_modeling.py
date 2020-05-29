@@ -99,14 +99,19 @@ class ConditionalTextDataset(Dataset):
                 lhs_str = text[:rhs_start_idx]
                 rhs_str = text[rhs_start_idx:]
 
+
                 tokenized_lhs = tokenizer.convert_tokens_to_ids(tokenizer.tokenize(lhs_str))
                 tokenized_rhs = tokenizer.convert_tokens_to_ids(tokenizer.tokenize(rhs_str))
-                self._truncate_seq_pair(tokenized_lhs, tokenized_rhs,
-                                        max_length=block_size - 1)
-                attention_mask = [1] * len(tokenized_lhs)
                 # DONT use padding token. Internal code uses that for masking
                 eos_token = tokenizer.eos_token_id or tokenizer.bos_token_id
                 bos_token = tokenizer.bos_token_id or tokenizer.eos_token_id
+                if args.add_bos:
+                    tokenized_lhs = [bos_token] + tokenized_lhs
+                    tokenized_rhs = [bos_token] + tokenized_rhs
+                self._truncate_seq_pair(tokenized_lhs, tokenized_rhs,
+                                        max_length=block_size - 1)
+                attention_mask = [1] * len(tokenized_lhs)
+
                 self.examples.append((tokenized_lhs,  # input
                                      tokenized_rhs + [eos_token], #labels
                                      attention_mask,  # mask
@@ -709,6 +714,7 @@ def main():
     )
     parser.add_argument("--do_train", action="store_true", help="Whether to run training.")
     parser.add_argument("--do_eval", action="store_true", help="Whether to run eval on the dev set.")
+    parser.add_argument("--add_bos", action="store_true", help="Add an extra BOS token in conditional text generation")
     parser.add_argument(
         "--evaluate_during_training", action="store_true", help="Run evaluation during training at each logging step."
     )

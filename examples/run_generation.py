@@ -245,9 +245,10 @@ def main():
                 preprocessed_prompt_text, add_special_tokens=False, return_tensors="pt", add_space_before_punct_symbol=True
             )
         else:
+            if args.add_bos:
+                prompt_text = tokenizer.bos_token + prompt_text
             encoded_prompt = tokenizer.encode(prompt_text, add_special_tokens=False, return_tensors="pt")
-        if args.add_bos:
-            encoded_prompt = [tokenizer.bos_token_id] + encoded_prompt
+
         encoded_prompt = encoded_prompt.to(args.device)
         if model.config.is_encoder_decoder:
             max_len = args.length

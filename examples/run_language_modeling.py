@@ -530,7 +530,8 @@ def get_model_outputs(args, model, inputs, labels, mask, decoder_input):
         # take the inputs + decoder inputs except the first <bos> token
         new_inputs = torch.cat([inputs, decoder_input[:, 1:, ]], dim=1)
         # ignore labels + gold labels except the last mask token
-        new_labels = torch.cat([-100 * torch.ones(inputs.shape, dtype=torch.long),
+        masked_labels = -100 * torch.ones(inputs.shape, dtype=torch.long, device=args.device)
+        new_labels = torch.cat([masked_labels,
                                 labels[:, :-1]], dim=1)
         outputs = model(input_ids=new_inputs, labels=new_labels)
     return outputs

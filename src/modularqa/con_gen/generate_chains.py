@@ -43,9 +43,14 @@ def create_labelled_chains(output_json, generator_verifiers,
     origq = output_json["question"]
     qid = output_json["id"]
     observed_sequences = set()
+    # ignore constraints that are inadmissible given the verifiers. e.g. if boolq model is
+    # not specified in the config, do not consider programs that rely on such a model
+    # This also handles FAILED and OUTOFSCOPE questions
     for idx, constraint in enumerate(qaconstraints):
-        if constraint.model == "FAILED" or constraint.model == "OUTOFSCOPE":
+        if constraint.model not in generator_verifiers:
             return positive_chains, negative_chains
+
+    for idx, constraint in enumerate(qaconstraints):
         newq_chains = []
         newa_chains = []
         newm_chains = []

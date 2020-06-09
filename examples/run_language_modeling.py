@@ -482,10 +482,10 @@ def train(args, train_dataset, model: PreTrainedModel, tokenizer: PreTrainedToke
                     logger.info("Saving model checkpoint to %s", output_dir)
 
                     _rotate_checkpoints(args, checkpoint_prefix)
-
-                    torch.save(optimizer.state_dict(), os.path.join(output_dir, "optimizer.pt"))
-                    torch.save(scheduler.state_dict(), os.path.join(output_dir, "scheduler.pt"))
-                    logger.info("Saving optimizer and scheduler states to %s", output_dir)
+                    # Never used and too large. Disable saving
+                    # torch.save(optimizer.state_dict(), os.path.join(output_dir, "optimizer.pt"))
+                    # torch.save(scheduler.state_dict(), os.path.join(output_dir, "scheduler.pt"))
+                    logger.info("Not saving optimizer and scheduler states. Too large!")
 
             if args.max_steps > 0 and global_step > args.max_steps:
                 epoch_iterator.close()

@@ -191,3 +191,35 @@ class LMQualityOverlapChecker(LMClassifier, ParticipantModel):
             new_state.last_output = "Overlap Score: {}".format(new_state._score)
 
         return new_state
+
+
+class DualLMQualityChecker(ParticipantModel):
+
+    def __init__(self, qgen, finalq):
+        self.qgen_qal = LMClassifier(**qgen)
+        self.finalq_qal = LMClassifier(**finalq)
+
+    def query(self, state, debug=False):
+        ## state data
+        data = state.data
+        ## copy the state
+        new_state = state.copy()
+        new_state._next = "qa"
+        origq = data["query"]
+        qchain = data["question_seq"]
+        achain = data["answer_seq"]
+        mchain = data["model_seq"]
+
+        if debug:
+            print("<QUALITYCHECK>: Qs: {} As: {} Q: {}".format(
+                ", ".join(qchain), ", ".join(achain), origq))
+
+        sequence = get_sequence_representation(origq, qchain, achain, mchain, for_generation=False)
+        if qchain[-1] == "[EOQ]":
+            output_probs = self.finalq_qal.score_sequence(sequence1=sequence)
+        else:
+            output_probs = self.qgen_qal.score_sequence(sequence1=sequence)
+
+        new_state.last_output = "Score: {}".format(output_probs)
+        new_state._score += output_probs[0]
+        return new_state

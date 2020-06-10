@@ -5,7 +5,7 @@ from modularqa.inference.participant_qa import LMQAParticipant, MathQAParticipan
     ModelRouter, BoolQAParticipant
 from modularqa.inference.participant_qgen import LMGenParticipant
 from modularqa.inference.quality_checkers import QualityCheckerExample, ChainOverlapScorer, \
-    LMQualityChecker, LMQualityOverlapChecker
+    LMQualityChecker, LMQualityOverlapChecker, DualLMQualityChecker
 
 MODEL_NAME_CLASS = {
     "lmgen": LMGenParticipant,
@@ -13,6 +13,7 @@ MODEL_NAME_CLASS = {
     "qual_example": QualityCheckerExample,
     "qual_overlap": ChainOverlapScorer,
     "qual_lm": LMQualityChecker,
+    "qual_dual_lm": DualLMQualityChecker,
     "qual_overlap_lm": LMQualityOverlapChecker,
     "mathqa": MathQAParticipant,
     "boolqa": BoolQAParticipant,

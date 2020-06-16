@@ -112,6 +112,7 @@ class TrainingArguments:
             )
         },
     )
+    save_states: bool = field(default=False, metadata={"help": "Save optimizer/scheduler states"})
     no_cuda: bool = field(default=False, metadata={"help": "Do not use CUDA even when it is available"})
     seed: int = field(default=42, metadata={"help": "random seed for initialization"})
 

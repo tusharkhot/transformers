@@ -400,7 +400,8 @@ def get_example_features_dataset(paragraphs: List[str], question, tokenizer, seq
         is_training=False,
         return_dataset="pt",
         threads=1,
-        pad_to_max=pad_to_max
+        pad_to_max=pad_to_max,
+        tqdm_enabled=False
     )
     return examples, features, dataset
 

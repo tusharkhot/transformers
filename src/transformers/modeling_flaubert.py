@@ -35,12 +35,13 @@ from .modeling_xlm import (
 
 logger = logging.getLogger(__name__)
 
-FLAUBERT_PRETRAINED_MODEL_ARCHIVE_MAP = {
-    "flaubert-small-cased": "https://s3.amazonaws.com/models.huggingface.co/bert/flaubert/flaubert_small_cased/pytorch_model.bin",
-    "flaubert-base-uncased": "https://s3.amazonaws.com/models.huggingface.co/bert/flaubert/flaubert_base_uncased/pytorch_model.bin",
-    "flaubert-base-cased": "https://s3.amazonaws.com/models.huggingface.co/bert/flaubert/flaubert_base_cased/pytorch_model.bin",
-    "flaubert-large-cased": "https://s3.amazonaws.com/models.huggingface.co/bert/flaubert/flaubert_large_cased/pytorch_model.bin",
-}
+FLAUBERT_PRETRAINED_MODEL_ARCHIVE_LIST = [
+    "flaubert/flaubert_small_cased",
+    "flaubert/flaubert_base_uncased",
+    "flaubert/flaubert_base_cased",
+    "flaubert/flaubert_large_cased",
+    # See all Flaubert models at https://huggingface.co/models?filter=flaubert
+]
 
 
 FLAUBERT_START_DOCSTRING = r"""
@@ -95,10 +96,12 @@ FLAUBERT_INPUTS_DOCSTRING = r"""
             Mask to nullify selected heads of the self-attention modules.
             Mask values selected in ``[0, 1]``:
             :obj:`1` indicates the head is **not masked**, :obj:`0` indicates the head is **masked**.
-        input_embeds (:obj:`torch.FloatTensor` of shape :obj:`(batch_size, sequence_length, hidden_size)`, `optional`, defaults to :obj:`None`):
+        inputs_embeds (:obj:`torch.FloatTensor` of shape :obj:`(batch_size, sequence_length, hidden_size)`, `optional`, defaults to :obj:`None`):
             Optionally, instead of passing :obj:`input_ids` you can choose to directly pass an embedded representation.
             This is useful if you want more control over how to convert `input_ids` indices into associated vectors
             than the model's internal embedding lookup matrix.
+        output_attentions (:obj:`bool`, `optional`, defaults to :obj:`None`):
+            If set to ``True``, the attentions tensors of all attention layers are returned. See ``attentions`` under returned tensors for more detail.
 """
 
 
@@ -109,10 +112,9 @@ FLAUBERT_INPUTS_DOCSTRING = r"""
 class FlaubertModel(XLMModel):
 
     config_class = FlaubertConfig
-    pretrained_model_archive_map = FLAUBERT_PRETRAINED_MODEL_ARCHIVE_MAP
 
     def __init__(self, config):  # , dico, is_encoder, with_output):
-        super(FlaubertModel, self).__init__(config)
+        super().__init__(config)
         self.layerdrop = getattr(config, "layerdrop", 0.0)
         self.pre_norm = getattr(config, "pre_norm", False)
 
@@ -128,6 +130,7 @@ class FlaubertModel(XLMModel):
         cache=None,
         head_mask=None,
         inputs_embeds=None,
+        output_attentions=None,
     ):
         r"""
     Return:
@@ -139,7 +142,7 @@ class FlaubertModel(XLMModel):
             of shape :obj:`(batch_size, sequence_length, hidden_size)`.
 
             Hidden-states of the model at the output of each layer plus the initial embedding outputs.
-        attentions (:obj:`tuple(torch.FloatTensor)`, `optional`, returned when ``config.output_attentions=True``):
+        attentions (:obj:`tuple(torch.FloatTensor)`, `optional`, returned when ``output_attentions=True`` is passed or ``config.output_attentions=True``):
             Tuple of :obj:`torch.FloatTensor` (one for each layer) of shape
             :obj:`(batch_size, num_heads, sequence_length, sequence_length)`.
 
@@ -158,6 +161,8 @@ class FlaubertModel(XLMModel):
         last_hidden_states = outputs[0]  # The last hidden-state is the first element of the output tuple
 
         """
+        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
+
         # removed: src_enc=None, src_len=None
         if input_ids is not None:
             bs, slen = input_ids.size()
@@ -201,23 +206,7 @@ class FlaubertModel(XLMModel):
             # langs = langs.transpose(0, 1)
 
         # Prepare head mask if needed
-        # 1.0 in head_mask indicate we keep the head
-        # attention_probs has shape bsz x n_heads x N x N
-        # input head_mask has shape [num_heads] or [num_hidden_layers x num_heads]
-        # and head_mask is converted to shape [num_hidden_layers x batch x num_heads x qlen x klen]
-        if head_mask is not None:
-            if head_mask.dim() == 1:
-                head_mask = head_mask.unsqueeze(0).unsqueeze(0).unsqueeze(-1).unsqueeze(-1)
-                head_mask = head_mask.expand(self.n_layers, -1, -1, -1, -1)
-            elif head_mask.dim() == 2:
-                head_mask = (
-                    head_mask.unsqueeze(1).unsqueeze(-1).unsqueeze(-1)
-                )  # We can specify head_mask for each layer
-            head_mask = head_mask.to(
-                dtype=next(self.parameters()).dtype
-            )  # switch to fload if need + fp16 compatibility
-        else:
-            head_mask = [None] * self.n_layers
+        head_mask = self.get_head_mask(head_mask, self.config.n_layers)
 
         # do not recompute cached elements
         if cache is not None and input_ids is not None:
@@ -256,9 +245,11 @@ class FlaubertModel(XLMModel):
 
             # self attention
             if not self.pre_norm:
-                attn_outputs = self.attentions[i](tensor, attn_mask, cache=cache, head_mask=head_mask[i])
+                attn_outputs = self.attentions[i](
+                    tensor, attn_mask, cache=cache, head_mask=head_mask[i], output_attentions=output_attentions,
+                )
                 attn = attn_outputs[0]
-                if self.output_attentions:
+                if output_attentions:
                     attentions = attentions + (attn_outputs[1],)
                 attn = F.dropout(attn, p=self.dropout, training=self.training)
                 tensor = tensor + attn
@@ -267,7 +258,7 @@ class FlaubertModel(XLMModel):
                 tensor_normalized = self.layer_norm1[i](tensor)
                 attn_outputs = self.attentions[i](tensor_normalized, attn_mask, cache=cache, head_mask=head_mask[i])
                 attn = attn_outputs[0]
-                if self.output_attentions:
+                if output_attentions:
                     attentions = attentions + (attn_outputs[1],)
                 attn = F.dropout(attn, p=self.dropout, training=self.training)
                 tensor = tensor + attn
@@ -303,7 +294,7 @@ class FlaubertModel(XLMModel):
         outputs = (tensor,)
         if self.output_hidden_states:
             outputs = outputs + (hidden_states,)
-        if self.output_attentions:
+        if output_attentions:
             outputs = outputs + (attentions,)
         return outputs  # outputs, (hidden_states), (attentions)
 
@@ -320,10 +311,9 @@ class FlaubertWithLMHeadModel(XLMWithLMHeadModel):
     """
 
     config_class = FlaubertConfig
-    pretrained_model_archive_map = FLAUBERT_PRETRAINED_MODEL_ARCHIVE_MAP
 
     def __init__(self, config):
-        super(FlaubertWithLMHeadModel, self).__init__(config)
+        super().__init__(config)
         self.transformer = FlaubertModel(config)
         self.init_weights()
 
@@ -340,10 +330,9 @@ class FlaubertForSequenceClassification(XLMForSequenceClassification):
     """
 
     config_class = FlaubertConfig
-    pretrained_model_archive_map = FLAUBERT_PRETRAINED_MODEL_ARCHIVE_MAP
 
     def __init__(self, config):
-        super(FlaubertForSequenceClassification, self).__init__(config)
+        super().__init__(config)
         self.transformer = FlaubertModel(config)
         self.init_weights()
 
@@ -360,10 +349,9 @@ class FlaubertForQuestionAnsweringSimple(XLMForQuestionAnsweringSimple):
     """
 
     config_class = FlaubertConfig
-    pretrained_model_archive_map = FLAUBERT_PRETRAINED_MODEL_ARCHIVE_MAP
 
     def __init__(self, config):
-        super(FlaubertForQuestionAnsweringSimple, self).__init__(config)
+        super().__init__(config)
         self.transformer = FlaubertModel(config)
         self.init_weights()
 
@@ -380,9 +368,8 @@ class FlaubertForQuestionAnswering(XLMForQuestionAnswering):
     """
 
     config_class = FlaubertConfig
-    pretrained_model_archive_map = FLAUBERT_PRETRAINED_MODEL_ARCHIVE_MAP
 
     def __init__(self, config):
-        super(FlaubertForQuestionAnswering, self).__init__(config)
+        super().__init__(config)
         self.transformer = FlaubertModel(config)
         self.init_weights()

@@ -18,7 +18,7 @@ import json
 import os
 import unittest
 
-from transformers.tokenization_roberta import VOCAB_FILES_NAMES, RobertaTokenizer
+from transformers.tokenization_roberta import VOCAB_FILES_NAMES, RobertaTokenizer, RobertaTokenizerFast
 
 from .test_tokenization_common import TokenizerTesterMixin
 from .utils import slow
@@ -68,7 +68,11 @@ class RobertaTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
         kwargs.update(self.special_tokens_map)
         return RobertaTokenizer.from_pretrained(self.tmpdirname, **kwargs)
 
-    def get_input_output_texts(self):
+    def get_rust_tokenizer(self, **kwargs):
+        kwargs.update(self.special_tokens_map)
+        return RobertaTokenizerFast.from_pretrained(self.tmpdirname, **kwargs)
+
+    def get_input_output_texts(self, tokenizer):
         input_text = "lower newer"
         output_text = "lower newer"
         return input_text, output_text
@@ -100,9 +104,11 @@ class RobertaTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
         text = tokenizer.encode("sequence builders", add_special_tokens=False)
         text_2 = tokenizer.encode("multi-sequence build", add_special_tokens=False)
 
-        encoded_text_from_decode = tokenizer.encode("sequence builders", add_special_tokens=True)
+        encoded_text_from_decode = tokenizer.encode(
+            "sequence builders", add_special_tokens=True, add_prefix_space=False
+        )
         encoded_pair_from_decode = tokenizer.encode(
-            "sequence builders", "multi-sequence build", add_special_tokens=True
+            "sequence builders", "multi-sequence build", add_special_tokens=True, add_prefix_space=False
         )
 
         encoded_sentence = tokenizer.build_inputs_with_special_tokens(text)

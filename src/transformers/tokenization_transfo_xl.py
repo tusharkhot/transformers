@@ -35,7 +35,8 @@ from tokenizers.pre_tokenizers import CharDelimiterSplit, WhitespaceSplit
 from tokenizers.processors import BertProcessing
 
 from .file_utils import cached_path, is_torch_available
-from .tokenization_utils import PreTrainedTokenizer, PreTrainedTokenizerFast
+from .tokenization_utils import PreTrainedTokenizer
+from .tokenization_utils_fast import PreTrainedTokenizerFast
 
 
 if is_torch_available():
@@ -100,13 +101,6 @@ class TransfoXLTokenizer(PreTrainedTokenizer):
         super().__init__(
             unk_token=unk_token, eos_token=eos_token, additional_special_tokens=additional_special_tokens, **kwargs
         )
-
-        self.max_len_single_sentence = (
-            self.max_len
-        )  # no default special tokens - you can update this value if you add special tokens
-        self.max_len_sentences_pair = (
-            self.max_len
-        )  # no default special tokens - you can update this value if you add special tokens
 
         if never_split is None:
             never_split = self.all_special_tokens
@@ -410,6 +404,16 @@ class _TransfoXLDelimiterLookupTokenizer(BaseTokenizer):
 
 
 class TransfoXLTokenizerFast(PreTrainedTokenizerFast):
+    """
+    Construct a "Fast" Transformer-XL tokenizer (backed by HuggingFace's `tokenizers` library).
+
+    The Transformer-XL tokenizer is a word-level tokenizer (no sub-word tokenization).
+
+    Adapted from Vocab class in https://github.com/kimiyoung/transformer-xl
+
+    This tokenizer inherits from :class:`~transformers.PreTrainedTokenizerFast` which contains most of the methods. Users
+    should refer to the superclass for more information regarding methods.
+    """
 
     vocab_files_names = VOCAB_FILES_NAMES_FAST
     pretrained_vocab_files_map = PRETRAINED_VOCAB_FILES_MAP_FAST

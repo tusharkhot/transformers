@@ -41,7 +41,7 @@ from transformers import (
     TrainingArguments,
     set_seed,
 )
-
+from transformers.data.datasets.language_modeling import ConditionalTextDataset
 
 logger = logging.getLogger(__name__)
 
@@ -95,6 +95,17 @@ class DataTrainingArguments:
         metadata={"help": "Whether distinct lines of text in the dataset are to be handled as distinct sequences."},
     )
 
+    conditional: bool = field(
+        default=False,
+        metadata={"help": "Train to produce output conditioned on the input."},
+
+    )
+
+    conditional_split: Optional[str] = field(
+        default="\t",
+        metadata={"help": "Split each line on this string to produce input-output pairs"},
+    )
+
     mlm: bool = field(
         default=False, metadata={"help": "Train with masked-language modeling loss instead of language modeling."}
     )
@@ -115,9 +126,16 @@ class DataTrainingArguments:
     )
 
 
-def get_dataset(args: DataTrainingArguments, tokenizer: PreTrainedTokenizer, evaluate=False):
+def get_dataset(args: DataTrainingArguments, train_args: TrainingArguments,
+                tokenizer: PreTrainedTokenizer, evaluate=False):
     file_path = args.eval_data_file if evaluate else args.train_data_file
-    if args.line_by_line:
+    if args.conditional:
+        return ConditionalTextDataset(tokenizer=tokenizer,
+                                      conditional_split=args.conditional_split,
+                                      output_dir=train_args.output_dir,
+                                      overwrite_cache=args.overwrite_cache,
+                                      file_path=file_path, block_size=args.block_size)
+    elif args.line_by_line:
         return LineByLineTextDataset(tokenizer=tokenizer, file_path=file_path, block_size=args.block_size)
     else:
         return TextDataset(
@@ -219,8 +237,8 @@ def main():
 
     # Get datasets
 
-    train_dataset = get_dataset(data_args, tokenizer=tokenizer) if training_args.do_train else None
-    eval_dataset = get_dataset(data_args, tokenizer=tokenizer, evaluate=True) if training_args.do_eval else None
+    train_dataset = get_dataset(data_args, training_args, tokenizer=tokenizer) if training_args.do_train else None
+    eval_dataset = get_dataset(data_args, training_args, tokenizer=tokenizer, evaluate=True) if training_args.do_eval else None
     data_collator = DataCollatorForLanguageModeling(
         tokenizer=tokenizer, mlm=data_args.mlm, mlm_probability=data_args.mlm_probability
     )

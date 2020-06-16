@@ -4,23 +4,14 @@
     "qgen": {
       "type": "lm",
       "model_path": "/qgen_gpt2/",
-      "num_samples": 5,
       "top_p": 0.95,
-      "length": 40
+      "num_samples": 20,
+      "sample_hints_groups": 3
     },
     "qa": {
       "type": "lm",
       "model_path": "/qa_bert/",
       "single_para": true
-    }
-  },
-  "math": {
-    "type": "basic",
-    "qgen": {
-      "type": "math_gen"
-    },
-    "qa": {
-      "type": "math_ver"
     }
   }
 }

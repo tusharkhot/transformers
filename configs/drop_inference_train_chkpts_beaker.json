@@ -4,9 +4,11 @@
   "models": {
     "gen": {
       "name": "lmgen",
-      "model_path": "/gpt2_qsimp/",
+      "model_path": "$MOD_DIR",
       "length": 40,
-      "num_samples": 5
+      "num_samples": 5,
+      "top_p": 0.95,
+      "add_bos": true
     },
     "qa": {
       "name": "model_router"
@@ -19,8 +21,7 @@
       "num_ans_para": 1
     },
     "qal":  {
-      "name": "qual_overlap",
-      "dump_chains": "/output/chains.tsv"
+      "name": "qual_overlap"
     },
     "math": {
       "name": "mathqa"

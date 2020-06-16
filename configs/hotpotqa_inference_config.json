@@ -4,9 +4,9 @@
   "models": {
     "gen": {
       "name": "lmgen",
-      "model_path": "../launchpadqa/data/hotpot_beaker/hotpotqa_bridge_hard_n20_n0.5_m0.5_a0.2/gpt2_small_3e_1e-5_b32_ckpt6000/",
+      "model_path": "../launchpadqa/data/hotpot_beaker/ex_tj45u770mqwa/",
       "length": 30,
-      "num_samples": 20
+      "num_samples": 1
     },
     "qa": {
       "name": "model_router"
@@ -20,7 +20,7 @@
       "num_ans_para": 1
     },
     "qal":  {
-      "name": "qual_bert",
+      "name": "qual_lm",
       "model_path": "../launchpadqa/data/hotpot_beaker/hotpot_n0to4_9_bert_lc_wm_5e_1e-5_b32_ckpt24000/"
     }
   }

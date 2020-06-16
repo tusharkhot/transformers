@@ -10,8 +10,20 @@
     },
     "qa": {
       "type": "lm",
-      "model_path": "/qa_bert/",
-      "single_para": true
+      "model_path": "/qa_bert/"
+    }
+  },
+  "squad_list": {
+    "type": "basic",
+    "qgen": {
+      "type": "lm",
+      "model_path": "/qgen_gpt2/",
+      "num_samples": 5,
+      "top_p": 0.95
+    },
+    "qa": {
+      "type": "lm_spans",
+      "model_path": "/qa_bert/"
     }
   },
   "math": {

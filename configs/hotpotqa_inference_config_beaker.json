@@ -1,0 +1,36 @@
+{
+  "start_state": "gen",
+  "end_state": "EOQ",
+  "models": {
+    "gen": {
+      "name": "lmgen",
+      "model_path": "/gpt2_qsimp",
+      "length": 30,
+      "num_samples": 10
+    },
+    "qa": {
+      "name": "model_router"
+    },
+    "squad": {
+      "name": "lmqa",
+      "model_path": "/bert_qa",
+      "single_para": true,
+      "hotpotqa_file": "/input/hotpot_dev_distractor_v1.json",
+      "num_ans_para": 1,
+      "merge_select_para": true
+    },
+    "qal":  {
+      "name": "qual_lm",
+      "model_path": "/bert_qal"
+    },
+    "math": {
+      "name": "mathqa"
+    },
+    "boolq": {
+      "name": "boolqa",
+      "hotpotqa_file": "/input/hotpot_dev_distractor_v1.json",
+      "model_path": "/qa_boolq/",
+      "task": "wnli"
+    }
+  }
+}

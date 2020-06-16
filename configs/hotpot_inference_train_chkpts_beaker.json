@@ -4,9 +4,11 @@
   "models": {
     "gen": {
       "name": "lmgen",
-      "model_path": "/gpt2_qsimp/",
+      "model_path": "$MOD_DIR",
       "length": 40,
-      "num_samples": 5
+      "num_samples": 5,
+      "top_p": 0.95,
+      "add_bos": true
     },
     "qa": {
       "name": "model_router"
@@ -15,12 +17,11 @@
       "name": "lmqa",
       "model_path": "/bert_qa/",
       "single_para": false,
-      "drop_file": "/input/drop_dataset_train.json",
+      "hotpotqa_file": "/input/hotpot_train_v1.1.json",
       "num_ans_para": 1
     },
     "qal":  {
-      "name": "qual_overlap",
-      "dump_chains": "/output/chains.tsv"
+      "name": "qual_overlap"
     },
     "math": {
       "name": "mathqa"

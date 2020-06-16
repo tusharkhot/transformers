@@ -20,7 +20,9 @@
     },
     "qa": {
       "type": "lm_spans",
-      "model_path": "data/squad/bert_output/"
+      "model_path": "data/squad/bert_output/",
+      "return_unique_list": true,
+      "num_ans_para": 20
     }
   },
   "math": {

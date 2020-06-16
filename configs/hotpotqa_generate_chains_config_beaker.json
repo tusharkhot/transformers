@@ -8,19 +8,8 @@
       "type": "lm",
       "model_path": "/qa_bert",
       "single_para": true,
-      "hotpotqa_file": "/drop/drop_dataset_train.json"
-    }
-  },
-  "squad_list": {
-    "type": "basic",
-    "qgen": {
-      "type": "dummy"
-    },
-    "qa": {
-      "type": "lm",
-      "model_path": "/qa_bert",
-      "single_para": true,
-      "hotpotqa_file": "/drop/drop_dataset_train.json"
+      "use_all_paras": true,
+      "hotpotqa_file": "/hotpot/hotpot_train_v1.1.json"
     }
   },
   "math": {

@@ -37,23 +37,26 @@ RUN apt-get update --fix-missing && apt-get install -y \
     gettext-base && \
     rm -rf /var/lib/apt/lists/*
 
-RUN python3 -m pip install nltk
+RUN python3 -m pip install --no-cache-dir --upgrade pip && \
+    python3 -m pip install --no-cache-dir \
+    jupyter \
+    mkl \
+    tensorflow \
+    torch \
+    tensorboard \
+    sklearn \
+    elasticsearch \
+    word2number \
+    nltk
+
 RUN python3 -m nltk.downloader stopwords
 RUN python3 -m nltk.downloader punkt
-RUN python3 -m pip install --no-cache-dir \
-    mkl \
-    torch \
-    tensorboard
-
-RUN python3 -m pip install --no-cache-dir sklearn
-RUN python3 -m pip install --no-cache-dir elasticsearch
-RUN python3 -m pip install --no-cache-dir word2number
 
 COPY README.md .
 COPY setup.py .
-COPY transformers-cli .
 COPY src/transformers src/transformers
 RUN python3 -m pip install --no-cache-dir .
+
 COPY src/modularqa src/modularqa
 COPY examples/ examples/
 

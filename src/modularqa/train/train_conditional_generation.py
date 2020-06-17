@@ -163,8 +163,8 @@ class ConditionalTextDataset(Dataset):
                 decoder_start_token = config.decoder_start_token_id or config.bos_token_id or config.eos_token_id
                 self._truncate_seq_pair(tokenized_lhs, tokenized_rhs,
                                         max_length=block_size - 5)
-                tokenized_lhs = config.bos_token_id + tokenized_lhs + config.eos_token_id
-                tokenized_rhs = config.bos_token_id + tokenized_rhs + config.eos_token_id
+                tokenized_lhs = [config.bos_token_id] + tokenized_lhs + [config.eos_token_id]
+                tokenized_rhs = [config.bos_token_id] + tokenized_rhs + [config.eos_token_id]
 
                 attention_mask = [1] * len(tokenized_lhs)
 

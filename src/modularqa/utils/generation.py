@@ -1,3 +1,5 @@
+import os
+
 import torch
 
 from transformers import AutoConfig, AutoTokenizer, AutoModelWithLMHead
@@ -62,8 +64,12 @@ class LMGenerator:
                 model_path,
                 cache_dir=None,
             )
+            if "checkpoint-" in model_path:
+                tokenizer_path = os.path.abspath(os.path.join(model_path, os.pardir))
+            else:
+                tokenizer_path = model_path
             tokenizer = AutoTokenizer.from_pretrained(
-                model_path,
+                tokenizer_path,
                 do_lower_case=False,
                 cache_dir=None,
             )

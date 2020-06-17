@@ -43,7 +43,7 @@ from transformers import (
     Trainer,
     TrainingArguments,
     set_seed,
-    AutoModelForSeq2SeqLM)
+    AutoModelForSeq2SeqLM, PretrainedConfig)
 
 logger = logging.getLogger(__name__)
 
@@ -117,7 +117,7 @@ class DataTrainingArguments:
 
 class ConditionalTextDataset(Dataset):
 
-    def __init__(self, tokenizer: PreTrainedTokenizer, file_path: str,
+    def __init__(self, tokenizer: PreTrainedTokenizer, config: PretrainedConfig, file_path: str,
                  conditional_split: str, line_by_line: bool,
                  output_dir: str, overwrite_cache=False,
                  block_size=512):
@@ -156,20 +156,22 @@ class ConditionalTextDataset(Dataset):
                     rhs_start_idx = 0
                 lhs_str = text[:rhs_start_idx]
                 rhs_str = text[rhs_start_idx:]
-
                 tokenized_lhs = tokenizer.convert_tokens_to_ids(tokenizer.tokenize(lhs_str))
                 tokenized_rhs = tokenizer.convert_tokens_to_ids(tokenizer.tokenize(rhs_str))
                 # DONT use padding token. Internal code uses that for masking
-                eos_token = tokenizer.eos_token_id or tokenizer.bos_token_id
-                bos_token = tokenizer.bos_token_id or tokenizer.eos_token_id
+                eos_token = config.eos_token_id or config.bos_token_id
+                decoder_start_token = config.decoder_start_token_id or config.bos_token_id or config.eos_token_id
                 self._truncate_seq_pair(tokenized_lhs, tokenized_rhs,
-                                        max_length=block_size - 1)
+                                        max_length=block_size - 5)
+                tokenized_lhs = config.bos_token_id + tokenized_lhs + config.eos_token_id
+                tokenized_rhs = config.bos_token_id + tokenized_rhs + config.eos_token_id
+
                 attention_mask = [1] * len(tokenized_lhs)
 
                 self.examples.append((tokenized_lhs,  # input
                                       tokenized_rhs + [eos_token], #labels
                                       attention_mask,  # mask
-                                      [bos_token] + tokenized_rhs # decoder
+                                      [decoder_start_token] + tokenized_rhs # decoder
                                       ))
                 if len(self.examples) < 5:
                     print(lhs_str)
@@ -241,9 +243,11 @@ class DataCollatorForSeq2Seq:
 
 
 def get_dataset(args: DataTrainingArguments, train_args: TrainingArguments,
+                config: PretrainedConfig,
                 tokenizer: PreTrainedTokenizer, evaluate=False):
     file_path = args.eval_data_file if evaluate else args.train_data_file
     return ConditionalTextDataset(tokenizer=tokenizer,
+                                  config=config,
                                   conditional_split=args.conditional_split,
                                   line_by_line=args.line_by_line,
                                   output_dir=train_args.output_dir,
@@ -338,8 +342,8 @@ def main():
         data_args.block_size = min(data_args.block_size, tokenizer.max_len)
 
     # Get datasets
-    train_dataset = get_dataset(data_args, training_args, tokenizer=tokenizer) if training_args.do_train else None
-    eval_dataset = get_dataset(data_args, training_args, tokenizer=tokenizer, evaluate=True) if training_args.do_eval else None
+    train_dataset = get_dataset(data_args, training_args, tokenizer=tokenizer, config=config) if training_args.do_train else None
+    eval_dataset = get_dataset(data_args, training_args, tokenizer=tokenizer, config=config, evaluate=True) if training_args.do_eval else None
     data_collator = DataCollatorForSeq2Seq(
         tokenizer=tokenizer
     )

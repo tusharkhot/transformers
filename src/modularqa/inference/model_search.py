@@ -80,6 +80,9 @@ class ModelController(object):
         :returns: a list of output
         :rtype: list
         """
+        if state.next not in self.model_list:
+            self.logger.error("Can not handle next state: " + state.next)
+            return []
         try:
             model_func = self.model_list[state.next]
 

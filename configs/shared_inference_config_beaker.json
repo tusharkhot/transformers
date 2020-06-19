@@ -1,0 +1,33 @@
+{
+  "start_state": "gen",
+  "end_state": "EOQ",
+  "models": {
+    "gen": {
+      "name": "lmgen",
+      "model_path": "/gpt2_qsimp",
+      "length": $L,
+      "num_samples": $N,
+      "top_p": $P,
+      "top_k": $K,
+      "do_sample": $DS,
+      "num_beams": $B
+    },
+    "qa": {
+      "name": "model_router"
+    },
+    "squad": {
+      "name": "lmqa",
+      "model_path": "/bert_qa/",
+      "drop_file": "$LOAD",
+      "num_ans_para": $AP,
+      "max_answers": $A
+    },
+    "qal":  {
+      "name": "qual_overlap_lm",
+      "model_path": "bert_qal"
+    },
+    "math": {
+      "name": "mathqa"
+    }
+  }
+}

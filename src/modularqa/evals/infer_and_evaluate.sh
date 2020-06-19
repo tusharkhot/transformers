@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+
+set -e
+
+L=$L N=$N P=$P K=$K B=$B DS=$DS LOAD=$LOAD envsubst < ${CONFIG_FILE} > ${OUTPUT}/new_config.json
+
+python -m modularqa.inference.configurable_inference \
+        --input $INPUT/$FILE \
+        --output $OUTPUT/predictions_$FILE \
+        --config $CONFIG/config.json --reader $DATASET
+
+if [[ "$DATASET" == "drop" ]]; then
+  python -m modularqa.evals.drop_eval \
+    --gold_path $INPUT/$FILE \
+    --prediction_path $OUTPUT/predictions_$FILE \
+    --output_path $OUTPUT/metrics.json
+else
+    python -m modularqa.evals.evaluate_hotpot_squad_format \
+    $OUTPUT/predictions_$FILE $INPUT/$FILE > $OUTPUT/metrics.json
+fi

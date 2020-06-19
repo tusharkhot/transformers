@@ -113,7 +113,7 @@ class MathQA:
                 pred_val = abs(date_diff)
             elif num1 is not None and num2 is not None:
                 # never asks for negative difference
-                pred_val = abs(num1 - num2)
+                pred_val = round(abs(num1 - num2), 2)
             else:
                 print("Can not parse question: {}".format(question))
                 return ""
@@ -191,7 +191,7 @@ class MathQA:
         if num is None:
             print("Can not parse question: {}".format(question))
             return ""
-        pred_val = 100 - num
+        pred_val = round(100 - num, 2)
         return str(pred_val)
 
 

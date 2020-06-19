@@ -18,13 +18,14 @@
     "squad": {
       "name": "lmqa",
       "model_path": "/bert_qa/",
-      "drop_file": "$LOAD",
+      "drop_file": "$DLOAD",
+      "hotpotqa_file": "$HLOAD",
       "num_ans_para": $AP,
       "max_answers": $A
     },
     "qal":  {
       "name": "qual_overlap_lm",
-      "model_path": "bert_qal"
+      "model_path": "/bert_qal/"
     },
     "math": {
       "name": "mathqa"

@@ -2,12 +2,12 @@
 
 set -e
 
-L=$L N=$N P=$P K=$K B=$B DS=$DS LOAD=$LOAD envsubst < ${CONFIG_FILE} > ${OUTPUT}/new_config.json
+L=$L N=$N P=$P K=$K B=$B DS=$DS LOAD=$LOAD envsubst < /configs/config.json > ${OUTPUT}/new_config.json
 
 python -m modularqa.inference.configurable_inference \
         --input $INPUT/$FILE \
         --output $OUTPUT/predictions_$FILE \
-        --config $CONFIG/config.json --reader $DATASET
+        --config ${OUTPUT}/new_config.json --reader $DATASET
 
 if [[ "$DATASET" == "drop" ]]; then
   python -m modularqa.evals.drop_eval \

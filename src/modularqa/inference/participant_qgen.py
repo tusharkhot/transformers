@@ -2,7 +2,6 @@ from math import ceil
 
 from modularqa.inference.model_search import ParticipantModel
 
-from modularqa.con_gen.generators import LMQuestionGenerator
 from modularqa.utils.generation import LMGenerator
 from modularqa.utils.seq_utils import get_sequence_representation
 
@@ -11,7 +10,7 @@ class LMGenParticipant(LMGenerator, ParticipantModel):
 
     def __init__(self, scale_by_step=1, **kwargs):
         self.scale_by_step = scale_by_step
-        super(LMGenerator, self).__init__(**kwargs)
+        super(LMGenParticipant, self).__init__(**kwargs)
 
     def query(self, state, debug=False):
         """The main function that interfaces with the overall search and

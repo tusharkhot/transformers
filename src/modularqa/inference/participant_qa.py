@@ -2,6 +2,7 @@ import re
 import string
 
 from modularqa.con_gen.verifiers import LMSpansQuestionVerifier, LMQuestionVerifier
+from modularqa.drop.drop_utils import get_number
 from modularqa.inference.model_search import ParticipantModel
 from modularqa.utils.classifier import LMClassifier
 from modularqa.utils.qa import LMQuestionAnswerer, BoolQuestionAnswerer
@@ -93,6 +94,8 @@ class LMQAParticipant(LMQuestionAnswerer, ParticipantModel):
             # new_state._score += bert_out.score
             ## strip unnecessary punctuations
             answer = bert_out.answer.strip(string.punctuation)
+            if re.match("^[0-9,.]+$", answer):
+                answer = answer.replace(",", "")
             new_state._data["answer_seq"].append(answer)
             new_state._data["para_seq"].append(bert_out.para_text)
 

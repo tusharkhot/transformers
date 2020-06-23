@@ -111,7 +111,7 @@ def generate_text_sequence(model, tokenizer, model_type, prompt_text, device,
         top_k=top_k,
         top_p=top_p,
         do_sample=do_sample,
-        num_beams=num_beams, no_repeat_ngram_size=3,
+        num_beams=num_beams,
         num_return_sequences=num_samples,
     )
 

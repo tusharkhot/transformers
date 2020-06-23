@@ -21,31 +21,30 @@ class MathQA:
 
     @staticmethod
     def date_difference(date1: str, date2: str, units: str="years"):
+        default_date = datetime(3000, 1, 1)
         try:
-            date1_datetime = parse(date1)
-            date2_datetime = parse(date2)
+            date1_datetime = parse(date1, default=default_date)
+            date2_datetime = parse(date2, default=default_date)
         except Exception:
             # couldn't parse date
             return None
-        curr_date = datetime.now()
-
         # if one doesn't have month set, not usable
-        if date1_datetime.year == curr_date.year and date1_datetime.month == curr_date.month:
+        if date1_datetime.year == default_date.year and date1_datetime.month == default_date.month:
             return None
-        if date2_datetime.year == curr_date.year and date2_datetime.month == curr_date.month:
+        if date2_datetime.year == default_date.year and date2_datetime.month == default_date.month:
             return None
 
-        if date1_datetime.year == curr_date.year and date2_datetime.year != curr_date.year:
+        if date1_datetime.year == default_date.year and date2_datetime.year != default_date.year:
             # one date is relative and other is not
             date1_datetime = date1_datetime.replace(year=date2_datetime.year)
-        elif date2_datetime.year == curr_date.year and date1_datetime.year != curr_date.year:
+        elif date2_datetime.year == default_date.year and date1_datetime.year != default_date.year:
             # one date is relative and other is not
             date2_datetime = date2_datetime.replace(year=date1_datetime.year)
 
         if units == "days":
             return (date1_datetime-date2_datetime).days
         if units == "months":
-            return relativedelta(date1_datetime, date2_datetime).months
+            return (date1_datetime.year - date2_datetime.year)*12 + (date1_datetime.month - date2_datetime.month)
         if units == "years":
             # human annotations are often on just the year value
             return date1_datetime.year - date2_datetime.year
@@ -106,17 +105,26 @@ class MathQA:
                     print("Can not parse question: {}".format(question))
                     return ""
         else:
-            num1 = parse_number(m.group(1))
-            num2 = parse_number(m.group(2))
-            date_diff = MathQA.date_difference(m.group(1), m.group(2))
-            if date_diff is not None:
-                pred_val = abs(date_diff)
-            elif num1 is not None and num2 is not None:
-                # never asks for negative difference
-                pred_val = round(abs(num1 - num2), 2)
+            # try a simple parse
+            num1 = get_number(m.group(1))
+            num2 = get_number(m.group(2))
+            # if it doesn't work, check dates
+            if num1 is None or num2 is None:
+                date_diff = MathQA.date_difference(m.group(1), m.group(2))
+                if date_diff is not None:
+                    pred_val = abs(date_diff)
+                else:
+                    # try a more permissive parse of numbers
+                    num1 = parse_number(m.group(1))
+                    num2 = parse_number(m.group(2))
+                    if num1 is not None and num2 is not None:
+                        # never asks for negative difference
+                        pred_val = round(abs(num1 - num2), 2)
+                    else:
+                        print("Can not parse question: {}".format(question))
+                        return ""
             else:
-                print("Can not parse question: {}".format(question))
-                return ""
+                pred_val = round(abs(num1 - num2), 2)
 
         return str(pred_val)
 
@@ -225,6 +233,11 @@ if __name__ == '__main__':
     answer = math_qa.answer_question(question)
     print("Q: {} \n A: {}".format(question, answer))
 
+    question = "diff(August 1922, 30 March 1922, months)"
+    answer = math_qa.answer_question(question)
+    print("Q: {} \n A: {}".format(question, answer))
+
+
     question = "if_then(23 > 15, Obama, Biden)"
     answer = math_qa.answer_question(question)
     print("Q: {} \n A: {}".format(question, answer))
@@ -234,6 +247,15 @@ if __name__ == '__main__':
     print("Q: {} \n A: {}".format(question, answer))
 
     question = "not(.4)"
+    answer = math_qa.answer_question(question)
+    print("Q: {} \n A: {}".format(question, answer))
+
+    question = "diff(110, 40)"
+    answer = math_qa.answer_question(question)
+    print("Q: {} \n A: {}".format(question, answer))
+
+
+    question = "diff(20 March 1525, 16 February 1525, days)"
     answer = math_qa.answer_question(question)
     print("Q: {} \n A: {}".format(question, answer))
 

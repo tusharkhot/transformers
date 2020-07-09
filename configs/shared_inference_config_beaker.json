@@ -10,7 +10,8 @@
       "top_p": $P,
       "top_k": $K,
       "do_sample": $DS,
-      "num_beams": $B
+      "num_beams": $B,
+      "scale_by_step": $SC
     },
     "qa": {
       "name": "model_router"
@@ -18,8 +19,9 @@
     "squad": {
       "name": "lmqa",
       "model_path": "/bert_qa/",
-      "drop_file": "$DLOAD",
-      "hotpotqa_file": "$HLOAD",
+      "drop_file": $DLOAD,
+      "hotpotqa_file": $HLOAD,
+      "squad_file": $SLOAD,
       "num_ans_para": $AP,
       "max_answers": $A
     },

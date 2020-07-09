@@ -2,7 +2,7 @@
 
 set -e
 
-L=$L N=$N P=$P K=$K B=$B DS=$DS DLOAD=$DLOAD HLOAD=$HLOAD envsubst < /configs/config.json > ${OUTPUT}/new_config.json
+L=$L N=$N P=$P K=$K B=$B DS=$DS DLOAD=$DLOAD HLOAD=$HLOAD SLOAD=$SLOAD envsubst < /configs/config.json > ${OUTPUT}/new_config.json
 
 python -m modularqa.inference.configurable_inference \
         --input $INPUT/$FILE \

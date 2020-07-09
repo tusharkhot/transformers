@@ -91,7 +91,8 @@ class LMQuestionAnswerer:
     path_to_modeltokenizer = {}
 
     def __init__(self, model_path, model_type=None,
-                 hotpotqa_file=None, drop_file=None, only_gold_para=False, return_all_ans=False,
+                 hotpotqa_file=None, drop_file=None, squad_file=None,
+                 only_gold_para=False, return_all_ans=False,
                  es_host=None, es_index="hpqa_para",
                  seq_length=512, num_ans_para=1, single_para=False, merge_select_para=False,
                  return_unique_list=False):
@@ -111,6 +112,8 @@ class LMQuestionAnswerer:
             self._qid_doc_map = get_qid_doc_map_hotpotqa(hotpotqa_file, only_gold_para)
         elif drop_file is not None:
             self._qid_doc_map = get_qid_doc_map_drop(drop_file)
+        elif squad_file is not None:
+            self._qid_doc_map = get_qid_doc_map_squad(squad_file)
         else:
             self._qid_doc_map = None
         if es_host is not None:
@@ -228,6 +231,7 @@ def get_qid_doc_map_hotpotqa(para_file, only_gold_para):
 
     return qid_doc_map
 
+
 def get_qid_doc_map_drop(drop_file):
     print("Loading paragraphs from {}".format(drop_file))
     with open(drop_file, "r") as input_fp:
@@ -242,6 +246,27 @@ def get_qid_doc_map_drop(drop_file):
 
     return qid_doc_map
 
+
+def get_qid_doc_map_squad(squad_file):
+    print("Loading paragraphs from {}".format(squad_file))
+    with open(squad_file, "r") as input_fp:
+        input_json = json.load(input_fp)
+
+    qid_doc_map = {}
+    for data in input_json["data"]:
+        title = data.get("title", "")
+        if title:
+            title_prefix = title.replace("_", " ") + "||"
+        else:
+            title_prefix = ""
+
+        for paragraph in data["paragraphs"]:
+            para = title_prefix + paragraph["context"].replace("\n", " ")
+            title_doc_map = {title: [para]}
+            for qa in paragraph["qas"]:
+                qid = qa["id"]
+                qid_doc_map[qid] = title_doc_map
+    return qid_doc_map
 
 def answer_question(question: str,
                     paragraphs: List[str],

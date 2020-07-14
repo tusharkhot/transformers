@@ -1,7 +1,3 @@
-from modularqa.retrievers.es_retriever import EsRetriever
-from modularqa.retrievers.file_retriever import FileRetriever
-from modularqa.retrievers.tfidf_retriever import TfidfDocRanker
-
 
 class Retriever:
 
@@ -9,6 +5,10 @@ class Retriever:
     def load_retriever(hotpotqa_file=None, drop_file=None, squad_file=None,
                        es_host=None, es_index="hpqa_para",
                        tfidf_file=None, db_file=None):
+        from modularqa.retrievers.es_retriever import EsRetriever
+        from modularqa.retrievers.file_retriever import FileRetriever
+        from modularqa.retrievers.tfidf_retriever import TfidfDocRanker
+
         if es_host and tfidf_file:
             raise ValueError("Only one of es_host or tfidf_file should be set!")
         if es_host:

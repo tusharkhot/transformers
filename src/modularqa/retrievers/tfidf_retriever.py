@@ -42,7 +42,7 @@ class TfidfDocRanker(Retriever):
         self.hash_size = metadata['hash_size']
         if metadata['tokenizer'] != "simple":
             raise ValueError("Can not handle non-simple tokenizers")
-        self.tokenizer = SimpleTokenizer
+        self.tokenizer = SimpleTokenizer()
         self.doc_freqs = metadata['doc_freqs'].squeeze()
         self.doc_dict = metadata['doc_dict']
         self.num_docs = len(self.doc_dict[0])

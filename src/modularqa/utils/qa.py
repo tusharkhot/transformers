@@ -6,6 +6,7 @@ import numpy as np
 import torch
 from elasticsearch import Elasticsearch
 
+from modularqa.retrievers.retriever import Retriever
 from modularqa.utils.classifier import LMClassifier
 from modularqa.utils.str_utils import tokenize_question, tokenize_document, overlap_score
 from transformers import AutoConfig, AutoTokenizer, AutoModelForQuestionAnswering
@@ -91,11 +92,11 @@ class LMQuestionAnswerer:
     path_to_modeltokenizer = {}
 
     def __init__(self, model_path, model_type=None,
-                 hotpotqa_file=None, drop_file=None, squad_file=None,
+                 # hotpotqa_file=None, drop_file=None, squad_file=None,
                  only_gold_para=False, return_all_ans=False,
-                 es_host=None, es_index="hpqa_para",
+                 # es_host=None, es_index="hpqa_para",
                  seq_length=512, num_ans_para=1, single_para=False, merge_select_para=False,
-                 return_unique_list=False):
+                 return_unique_list=False, **kwargs):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model, self.tokenizer = LMQuestionAnswerer.load_model_tokenizer(model_path,
                                                                              device=self.device)
@@ -107,20 +108,21 @@ class LMQuestionAnswerer:
         self.return_unique_list = return_unique_list
         self.merge_select_para = merge_select_para
         self.return_all_ans = return_all_ans
-        # if para_file is passed, load the documents from this file
-        if hotpotqa_file is not None:
-            self._qid_doc_map = get_qid_doc_map_hotpotqa(hotpotqa_file, only_gold_para)
-        elif drop_file is not None:
-            self._qid_doc_map = get_qid_doc_map_drop(drop_file)
-        elif squad_file is not None:
-            self._qid_doc_map = get_qid_doc_map_squad(squad_file)
-        else:
-            self._qid_doc_map = None
-        if es_host is not None:
-            self._es = Elasticsearch([es_host], retries=3, timeout=180)
-            self._es_index = es_index
-        else:
-            self._es = None
+        self.retriever = Retriever.load_retriever(**kwargs)
+        # # if para_file is passed, load the documents from this file
+        # if hotpotqa_file is not None:
+        #     self._qid_doc_map = get_qid_doc_map_hotpotqa(hotpotqa_file, only_gold_para)
+        # elif drop_file is not None:
+        #     self._qid_doc_map = get_qid_doc_map_drop(drop_file)
+        # elif squad_file is not None:
+        #     self._qid_doc_map = get_qid_doc_map_squad(squad_file)
+        # else:
+        #     self._qid_doc_map = None
+        # if es_host is not None:
+        #     self._es = Elasticsearch([es_host], retries=3, timeout=180)
+        #     self._es_index = es_index
+        # else:
+        #     self._es = None
 
     @staticmethod
     def load_model_tokenizer(model_path, device):
@@ -167,22 +169,24 @@ class LMQuestionAnswerer:
         :param qid: question id
         :return: answer
         """
-        if self._qid_doc_map is None:
-            if self._es is None:
-                raise ValueError("QA model should be constructed with an input HotPotQA/DROP file"
-                                 " to load qid -> doc map")
-            else:
-                paragraphs = search_es(es=self._es, es_index=self._es_index, question=question,
-                                       num_es_hits=5)
-                return self.answer_question(question, paragraphs)
-        else:
-            if qid not in self._qid_doc_map:
-                raise ValueError("QID: {} not found in the qid->doc map loaded.".format(qid))
-            else:
-                doc_map = self._qid_doc_map[qid]
-                # ignore title as it is not present in SQuAD models
-                paragraphs = [" ".join(doc) for (t, doc) in doc_map.items()]
-                return self.answer_question(question, paragraphs, normalize=normalize)
+        paragraphs = self.retriever.retrieve_paragraphs(qid, question)
+        return self.answer_question(question, paragraphs, normalize=normalize)
+        # if self._qid_doc_map is None:
+        #     if self._es is None:
+        #         raise ValueError("QA model should be constructed with an input HotPotQA/DROP file"
+        #                          " to load qid -> doc map")
+        #     else:
+        #         paragraphs = search_es(es=self._es, es_index=self._es_index, question=question,
+        #                                num_es_hits=5)
+        #         return self.answer_question(question, paragraphs)
+        # else:
+        #     if qid not in self._qid_doc_map:
+        #         raise ValueError("QID: {} not found in the qid->doc map loaded.".format(qid))
+        #     else:
+        #         doc_map = self._qid_doc_map[qid]
+        #         # ignore title as it is not present in SQuAD models
+        #         paragraphs = [" ".join(doc) for (t, doc) in doc_map.items()]
+        #         return self.answer_question(question, paragraphs, normalize=normalize)
 
 
 def search_es(es, es_index, question, num_es_hits):

@@ -1,12 +1,12 @@
+import json
 import re
 import string
 
-from modularqa.con_gen.verifiers import LMSpansQuestionVerifier, LMQuestionVerifier
-from modularqa.drop.drop_utils import get_number
+from modularqa.con_gen.constraints import QAConstraint
 from modularqa.inference.model_search import ParticipantModel
-from modularqa.utils.classifier import LMClassifier
-from modularqa.utils.qa import LMQuestionAnswerer, BoolQuestionAnswerer
 from modularqa.utils.math_qa import MathQA
+from modularqa.utils.qa import LMQuestionAnswerer, BoolQuestionAnswerer
+
 
 class ModelRouter(ParticipantModel):
 
@@ -36,8 +36,8 @@ class ModelRouter(ParticipantModel):
             new_state._next = send_to
         else:
             print("Question didn't match format!: {}".format(question))
-            #new_state = state.copy()
-            #new_state._score = float('inf')
+            # new_state = state.copy()
+            # new_state._score = float('inf')
             return []
 
         return [new_state]
@@ -51,9 +51,35 @@ class LMQAParticipant(LMQuestionAnswerer, ParticipantModel):
     in the controller.
     """
 
-    def __init__(self, max_answers=1, **kwargs):
+    def __init__(self, max_answers=1, exp_ans_file=None, output_qa=None, **kwargs):
         self.max_answers = max_answers
+        self.exp_ans_map = self.load_exp_ans(exp_ans_file)
+        self.output_qa = output_qa
         super(LMQAParticipant, self).__init__(**kwargs)
+
+    def load_exp_ans(self, exp_ans_file):
+        exp_ans_map = {}
+        with open(exp_ans_file, "r") as exp_ans_fp:
+            for line in exp_ans_fp:
+                input_json = json.loads(line)
+                qaconstraints = [QAConstraint.from_json(c) for c in input_json["constraints"]]
+                qid = input_json["id"]
+                if qid not in exp_ans_map:
+                    exp_ans_map[qid] = {}
+                for idx, constraint in enumerate(qaconstraints):
+                    if constraint.model == "FAILED" or constraint.model == "OUTOFSCOPE":
+                        break
+                    if not constraint.aconstraint.exp_ans:
+                        break
+                    if idx not in exp_ans_map[qid]:
+                        exp_ans_map[qid][idx] = set()
+                    exp_ans_map[qid][idx].add(constraint.aconstraint.exp_ans)
+        return exp_ans_map
+
+    def get_exp_ans(self, qid, idx):
+        if qid in self.exp_ans_map and idx in self.exp_ans_map[qid]:
+            return self.exp_ans_map[qid][idx]
+        return []
 
     def query(self, state, debug=False):
         """The main function that interfaces with the overall search and
@@ -81,6 +107,18 @@ class LMQAParticipant(LMQuestionAnswerer, ParticipantModel):
         new_states = []
 
         for bert_out in model_output:
+            if self.output_qa:
+                exp_ans = self.get_exp_ans(qid, len(data["answer_seq"]))
+                with open(self.output_qa, 'a') as qa_fp:
+                    row = [qid, question, "==".join(exp_ans), bert_out.answer]
+                    qa_fp.write("\t".join(row))
+                if len(exp_ans) == 1:
+                    # if there is an unique answer
+                    exp_ans_val = exp_ans[0]
+                    if exp_ans_val in bert_out.para_text:
+                        bert_out.answer = exp_ans_val
+                    else:
+                        bert_out.answer = ""
             if bert_out.answer == "":
                 continue
             if debug:

@@ -7,7 +7,7 @@ L=$L N=$N P=$P K=$K B=$B DS=$DS DLOAD=$DLOAD HLOAD=$HLOAD SLOAD=$SLOAD envsubst 
 python -m modularqa.inference.configurable_inference \
         --input $INPUT/$FILE \
         --output $OUTPUT/predictions_$FILE \
-        --config ${OUTPUT}/new_config.json --reader $DATASET
+        --config ${OUTPUT}/new_config.json --reader $DATASET --threads $THREAD
 
 if [[ "$DATASET" == "drop" ]]; then
   python -m modularqa.evals.drop_eval \

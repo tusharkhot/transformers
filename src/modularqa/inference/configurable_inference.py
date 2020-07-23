@@ -21,6 +21,8 @@ def parse_arguments():
                             help="Debug output")
     arg_parser.add_argument('--demo', action='store_true', default=False,
                             help="Demo mode")
+    arg_parser.add_argument('--threads', default=1, type=int,
+                            help="Number of threads (use MP if set to >1)")
     return arg_parser.parse_args()
 
 
@@ -58,7 +60,7 @@ if __name__ == "__main__":
     # ## step 3: run decomposer #
     #############################
     print("Running decomposer on examples")
-    output_json = {}
+    output_json = []
 
     if args.demo:
         while True:
@@ -80,19 +82,15 @@ if __name__ == "__main__":
                 chain += " S: " + str(final_state._score)
                 print(chain)
     else:
-        for example in reader.read_examples(args.input):
-            final_state = decomposer.find_answer_decomp(example, debug=args.debug)
-            if final_state is None:
-                print(example["question"] + " FAILED!")
-                output_json[example["qid"]] = ""
-            else:
-                data = final_state._data
-                chain = example["question"]
-                for q, a in zip(data["question_seq"], data["answer_seq"]):
-                    chain += " Q: {} A: {}".format(q, a)
-                chain += " S: " + str(final_state._score)
-                print(chain)
-                output_json[example["qid"]] = final_state._data["answer_seq"][-1]
+        if args.threads > 1:
+            import multiprocessing as mp
+            mp.set_start_method("spawn")
+            with mp.Pool(args.threads) as p:
+                output_json = p.map(decomposer.return_qid_prediction,
+                                    reader.read_examples(args.input))
+        else:
+            for example in reader.read_examples(args.input):
+                output_json.append(decomposer.return_qid_prediction(example))
 
         with open(args.output, "w") as output_fp:
-            json.dump(output_json, output_fp)
+            json.dump(dict(output_json), output_fp)

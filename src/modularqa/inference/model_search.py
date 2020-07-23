@@ -230,6 +230,20 @@ class QuestionSearchBase(object):
         """
         pass
 
+    def return_qid_prediction(self, example, debug=False):
+        final_state = self.find_answer_decomp(example, debug=debug)
+        if final_state is None:
+            print(example["question"] + " FAILED!")
+            return (example["qid"], "")
+        else:
+            data = final_state._data
+            chain = example["question"]
+            for q, a in zip(data["question_seq"], data["answer_seq"]):
+                chain += " Q: {} A: {}".format(q, a)
+            chain += " S: " + str(final_state._score)
+            print(chain)
+            return (example["qid"], final_state._data["answer_seq"][-1])
+
 
 class DepthFirstSearch(QuestionSearchBase):
 

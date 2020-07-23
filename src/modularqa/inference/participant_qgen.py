@@ -1,7 +1,7 @@
+import json
 from math import ceil
 
 from modularqa.inference.model_search import ParticipantModel
-
 from modularqa.utils.generation import LMGenerator
 from modularqa.utils.seq_utils import get_sequence_representation
 
@@ -37,7 +37,7 @@ class LMGenParticipant(LMGenerator, ParticipantModel):
 
         ## eventual output
         new_states = []
-        num_samples = ceil(self.num_samples * pow((1/self.scale_by_step), len(answer_seq)))
+        num_samples = ceil(self.num_samples * pow((1 / self.scale_by_step), len(answer_seq)))
         ## go through generated questions
         for output in list(set(self.generate_sequences(gen_seq, num_samples=num_samples))):
             output = output.strip()
@@ -56,3 +56,22 @@ class LMGenParticipant(LMGenerator, ParticipantModel):
             new_states.append(new_state)
         ##
         return new_states
+
+
+class DecompRCGenParticipant(ParticipantModel):
+    """
+    Model that produces the decompositions as specified in the input file
+    """
+
+    def __init__(self, decomp_file):
+        self.decompositions = self.load_decomp_file(decomp_file)
+
+    def load_decomp_file(self, file):
+        with input(file, "r") as input_fp:
+            input_json = json.load(input_fp)
+
+        return None
+
+    def query(self, state, debug=False):
+        raise NotImplementedError()
+        return None

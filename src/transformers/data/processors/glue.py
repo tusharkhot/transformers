@@ -139,7 +139,7 @@ def _glue_convert_examples_to_features(
 
     batch_encoding = tokenizer.batch_encode_plus(
         [(example.text_a, example.text_b) for example in examples], max_length=max_length, pad_to_max_length=True,
-        return_token_type_ids=True
+        return_token_type_ids=True, truncation=True
     )
 
     features = []

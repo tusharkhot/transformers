@@ -97,6 +97,7 @@ def generate_text_sequence(model, tokenizer, model_type, prompt_text, device,
             prompt_text = tokenizer.bos_token + prompt_text
         encoded_prompt = tokenizer.encode(prompt_text, add_special_tokens=False,
                                           max_length=tokenizer.max_len - length,
+                                          verbose=False,
                                           return_tensors="pt")
 
     encoded_prompt = encoded_prompt.to(device)

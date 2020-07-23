@@ -25,7 +25,7 @@ class FileRetriever(Retriever):
             paragraphs = [" ".join(doc) for (t, doc) in doc_map.items()]
             return paragraphs
 
-    def get_qid_doc_map_hotpotqa(self, para_file, only_gold_para):
+    def get_qid_doc_map_hotpotqa(self, para_file, only_gold_para=False):
         print("Loading paragraphs from {}".format(para_file))
         with open(para_file, "r") as input_fp:
             input_json = json.load(input_fp)

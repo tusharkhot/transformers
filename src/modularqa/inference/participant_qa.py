@@ -53,7 +53,7 @@ class LMQAParticipant(LMQuestionAnswerer, ParticipantModel):
 
     def __init__(self, max_answers=1, exp_ans_file=None, output_qa=None, **kwargs):
         self.max_answers = max_answers
-        self.exp_ans_map = self.load_exp_ans(exp_ans_file)
+        self.exp_ans_map = self.load_exp_ans(exp_ans_file) if exp_ans_file else None
         self.output_qa = output_qa
         super(LMQAParticipant, self).__init__(**kwargs)
 
@@ -110,11 +110,11 @@ class LMQAParticipant(LMQuestionAnswerer, ParticipantModel):
             if self.output_qa:
                 exp_ans = self.get_exp_ans(qid, len(data["answer_seq"]))
                 with open(self.output_qa, 'a') as qa_fp:
-                    row = [qid, question, "==".join(exp_ans), bert_out.answer]
-                    qa_fp.write("\t".join(row))
+                    row = [qid, question, "==".join(exp_ans), bert_out.answer, bert_out.para_text]
+                    qa_fp.write("\t".join(row) + "\n")
                 if len(exp_ans) == 1:
                     # if there is an unique answer
-                    exp_ans_val = exp_ans[0]
+                    exp_ans_val = list(exp_ans)[0]
                     if exp_ans_val in bert_out.para_text:
                         bert_out.answer = exp_ans_val
                     else:

@@ -69,7 +69,7 @@ if __name__ == "__main__":
                 "query": question,
                 "question": question
             }
-            final_state = decomposer.find_answer_decomp(example, debug=args.debug)
+            final_state, other_states = decomposer.find_answer_decomp(example, debug=args.debug)
             if final_state is None:
                 print("FAILED!")
             else:

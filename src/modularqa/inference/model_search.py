@@ -231,7 +231,7 @@ class QuestionSearchBase(object):
         pass
 
     def return_qid_prediction(self, example, debug=False):
-        final_state = self.find_answer_decomp(example, debug=debug)
+        final_state, other_states = self.find_answer_decomp(example, debug=debug)
         if final_state is None:
             print(example["question"] + " FAILED!")
             return (example["qid"], "")
@@ -303,7 +303,7 @@ class BestFirstDecomposer(QuestionSearchBase):
             ## end state
             if current_state.next == self.controller.end_state:
                 if debug: print("[TERMINATED]\n%s" % current_state)
-                return current_state
+                return current_state, heapq
 
                 ## generate output and new stated
             for new_state in self.controller.execute(current_state, debug=debug):

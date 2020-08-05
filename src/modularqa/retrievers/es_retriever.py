@@ -6,6 +6,7 @@ from modularqa.retrievers.retriever import Retriever
 class EsRetriever(Retriever):
 
     def __init__(self, es_host, es_index, num_es_hits):
+        super().__init__()
         self.es = Elasticsearch([es_host], retries=3, timeout=180)
         self.es_index = es_index
         self.num_es_hits = num_es_hits

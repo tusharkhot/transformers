@@ -6,6 +6,7 @@ from modularqa.retrievers.retriever import Retriever
 class FileRetriever(Retriever):
 
     def __init__(self, hotpotqa_file=None, drop_file=None, squad_file=None):
+        super().__init__()
         if hotpotqa_file is not None:
             self._qid_doc_map = self.get_qid_doc_map_hotpotqa(hotpotqa_file)
         elif drop_file is not None:

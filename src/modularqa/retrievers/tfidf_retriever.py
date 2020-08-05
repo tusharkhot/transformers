@@ -33,6 +33,7 @@ class TfidfDocRanker(Retriever):
             tfidf_path: path to saved model file
             strict: fail on empty queries or continue (and return empty result)
         """
+        super().__init__()
         # Load from disk
         tfidf_path = tfidf_file
         logger.info('Loading %s' % tfidf_path)

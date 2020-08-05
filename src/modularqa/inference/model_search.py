@@ -303,7 +303,7 @@ class BestFirstDecomposer(QuestionSearchBase):
             ## end state
             if current_state.next == self.controller.end_state:
                 if debug: print("[TERMINATED]\n%s" % current_state)
-                return current_state, heapq
+                return current_state, heap
 
                 ## generate output and new stated
             for new_state in self.controller.execute(current_state, debug=debug):

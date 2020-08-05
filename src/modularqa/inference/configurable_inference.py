@@ -26,17 +26,9 @@ def parse_arguments():
     return arg_parser.parse_args()
 
 
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.ERROR)
-    args = parse_arguments()
-
-    ################################
-    # ## step 1: initialize models #
-    ################################
-    with open(args.config, "r") as input_fp:
-        config_map = json.load(input_fp)
-
+def load_decomposer(config_map):
     print("loading participant models (might take a while)...")
+    model_map = {}
     for key, value in config_map["models"].items():
         class_name = value.pop("name")
         if class_name not in MODEL_NAME_CLASS:
@@ -47,18 +39,24 @@ if __name__ == "__main__":
             raise ValueError("Overriding key: {} with value: {} using instantiated model of type:"
                              " {}".format(key, config_map[key], class_name))
         config_map[key] = model.query
-
-    ###############################################################
-    # ## step 2: add to controller spec and initialize controller #
-    ###############################################################
-
+        model_map[key] = model
     ## instantiating
     controller = ModelController(config_map, QuestionGeneratorData)
     decomposer = BestFirstDecomposer(controller)
+    return decomposer, model_map
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.ERROR)
+    args = parse_arguments()
+
+
+    with open(args.config, "r") as input_fp:
+        config_map = json.load(input_fp)
+
+    decomposer, model_map = load_decomposer(config_map)
     reader: DatasetReader = READER_NAME_CLASS[args.reader]()
-    #############################
-    # ## step 3: run decomposer #
-    #############################
+
+
     print("Running decomposer on examples")
     output_json = []
 

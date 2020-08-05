@@ -15,8 +15,9 @@ class FileRetriever(Retriever):
         else:
             self._qid_doc_map = None
 
-
     def retrieve_paragraphs(self, qid, question):
+        if qid in self.hard_coded_paras:
+            return self.hard_coded_paras[qid]
         if qid not in self._qid_doc_map:
             raise ValueError("QID: {} not found in the qid->doc map loaded.".format(qid))
         else:

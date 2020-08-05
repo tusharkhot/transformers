@@ -39,4 +39,6 @@ class EsRetriever(Retriever):
         return hits
 
     def retrieve_paragraphs(self, qid, question):
+        if qid in self.hard_coded_paras:
+            return self.hard_coded_paras[qid]
         self.search_es(question, self.num_es_hits)

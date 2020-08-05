@@ -51,6 +51,8 @@ class TfidfDocRanker(Retriever):
         self.num_paras = num_paras
 
     def retrieve_paragraphs(self, qid, question):
+        if qid in self.hard_coded_paras:
+            return self.hard_coded_paras[qid]
         docids, doc_scores = self.closest_docs(question, self.num_paras)
         paragraphs = [self.db.get_doc_text(docid) for docid in docids]
         return paragraphs

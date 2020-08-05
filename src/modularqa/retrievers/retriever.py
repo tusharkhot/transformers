@@ -1,6 +1,12 @@
 
 class Retriever:
 
+    def __init__(self):
+        self.hard_coded_paras = {}
+
+    def set_paras(self, id, paras):
+        self.hard_coded_paras[id] = paras
+
     @staticmethod
     def load_retriever(hotpotqa_file=None, drop_file=None, squad_file=None,
                        es_host=None, es_index="hpqa_para",

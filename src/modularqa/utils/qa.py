@@ -46,7 +46,8 @@ class BoolQuestionAnswerer:
             self._es = None
         self.classifier = LMClassifier(**kwargs)
 
-    def answer_question(self, question: str, paragraphs: List[str]):
+    def answer_question(self, question: str, paragraphs: List[str],
+                        num_ans: int = None, return_all_ans: bool = None):
         # check if any paragraph returns a yes
         best_score = -1
         best_para = None
@@ -92,9 +93,7 @@ class LMQuestionAnswerer:
     path_to_modeltokenizer = {}
 
     def __init__(self, model_path, model_type=None,
-                 # hotpotqa_file=None, drop_file=None, squad_file=None,
                  only_gold_para=False, return_all_ans=False,
-                 # es_host=None, es_index="hpqa_para",
                  seq_length=512, num_ans_para=1, single_para=False, merge_select_para=False,
                  return_unique_list=False, **kwargs):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -109,20 +108,6 @@ class LMQuestionAnswerer:
         self.merge_select_para = merge_select_para
         self.return_all_ans = return_all_ans
         self.retriever = Retriever.load_retriever(**kwargs)
-        # # if para_file is passed, load the documents from this file
-        # if hotpotqa_file is not None:
-        #     self._qid_doc_map = get_qid_doc_map_hotpotqa(hotpotqa_file, only_gold_para)
-        # elif drop_file is not None:
-        #     self._qid_doc_map = get_qid_doc_map_drop(drop_file)
-        # elif squad_file is not None:
-        #     self._qid_doc_map = get_qid_doc_map_squad(squad_file)
-        # else:
-        #     self._qid_doc_map = None
-        # if es_host is not None:
-        #     self._es = Elasticsearch([es_host], retries=3, timeout=180)
-        #     self._es_index = es_index
-        # else:
-        #     self._es = None
 
     @staticmethod
     def load_model_tokenizer(model_path, device):
@@ -149,20 +134,27 @@ class LMQuestionAnswerer:
             LMQuestionAnswerer.path_to_modeltokenizer[model_path] = (model, tokenizer)
             return model, tokenizer
 
-    def answer_question(self, question: str, paragraphs: List[str], normalize=False):
+    def answer_question(self, question: str, paragraphs: List[str], normalize=False,
+                        num_ans: int = None, return_all_ans: bool = None):
+        if num_ans is None:
+            num_ans = self.num_ans_para
+        if return_all_ans is None:
+            return_all_ans = self.return_all_ans
+
         return answer_question(question=question, model=self.model,
                                model_type=self.model_type,
                                paragraphs=paragraphs,
                                tokenizer=self.tokenizer,
                                device=self.device, length=self.seq_length,
-                               num_ans_para=self.num_ans_para,
+                               num_ans_para=num_ans,
                                merge_select_para=self.merge_select_para,
-                               normalize=normalize, return_all_ans=self.return_all_ans,
+                               normalize=normalize, return_all_ans=return_all_ans,
                                return_unique_list=self.return_unique_list,
                                single_para=self.single_para)
 
 
-    def answer_question_only(self, question: str, qid: str, normalize=False):
+    def answer_question_only(self, question: str, qid: str, normalize=False,
+                             num_ans: int = None, return_all_ans: bool = None):
         """
         Answer question using title+paras for the question corresponding to this QID
         :param question: input question
@@ -170,23 +162,8 @@ class LMQuestionAnswerer:
         :return: answer
         """
         paragraphs = self.retriever.retrieve_paragraphs(qid, question)
-        return self.answer_question(question, paragraphs, normalize=normalize)
-        # if self._qid_doc_map is None:
-        #     if self._es is None:
-        #         raise ValueError("QA model should be constructed with an input HotPotQA/DROP file"
-        #                          " to load qid -> doc map")
-        #     else:
-        #         paragraphs = search_es(es=self._es, es_index=self._es_index, question=question,
-        #                                num_es_hits=5)
-        #         return self.answer_question(question, paragraphs)
-        # else:
-        #     if qid not in self._qid_doc_map:
-        #         raise ValueError("QID: {} not found in the qid->doc map loaded.".format(qid))
-        #     else:
-        #         doc_map = self._qid_doc_map[qid]
-        #         # ignore title as it is not present in SQuAD models
-        #         paragraphs = [" ".join(doc) for (t, doc) in doc_map.items()]
-        #         return self.answer_question(question, paragraphs, normalize=normalize)
+        return self.answer_question(question, paragraphs, normalize=normalize,
+                                    num_ans=num_ans, return_all_ans=return_all_ans)
 
 
 def search_es(es, es_index, question, num_es_hits):

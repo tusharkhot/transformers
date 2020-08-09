@@ -292,7 +292,7 @@ class BestFirstDecomposer(QuestionSearchBase):
         while True:
             if len(heap) == 0:
                 if debug: print("[FAILED]: %s" % init_input)
-                return None
+                return None, []
 
             ## pop from heap
             current_state = heapq.heappop(heap)

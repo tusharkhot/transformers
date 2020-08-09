@@ -1,4 +1,5 @@
 import re
+from typing import List
 
 from dateutil.relativedelta import relativedelta
 
@@ -51,7 +52,8 @@ class MathQA:
         print("Unknown unit:" + units)
         return None
 
-    def answer_question(self, question: str) -> str:
+    def answer_question(self, question: str, paragraphs: List[str],
+                        num_ans: int = None, return_all_ans: bool = None) -> str:
         for operation, func in self.valid_operation_func.items():
             m = re.match("{}\(.*\)".format(operation), question)
             if m:

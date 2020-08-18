@@ -30,7 +30,7 @@ class QualityCheckerExample(ParticipantModel):
             ## if so, manipulates the score to be infinity
             new_state.last_output = "terrible quality!"
             new_state._score = float('inf')
-
+            new_state._data["score_seq"].append(new_state._score)
         else:
             new_state.last_output = "good quality!"
 
@@ -86,6 +86,7 @@ class ChainOverlapScorer(ParticipantModel):
                                             score_answers=False)
             new_state._score = new_tok_score
 
+        new_state._data["score_seq"].append(new_state._score)
         new_state.last_output = "Missed: {} New: {}".format(",".join(missed_toks),
                                                             ",".join(new_toks))
 
@@ -140,13 +141,17 @@ class LMQualityChecker(LMClassifier, ParticipantModel):
 
         # print(sequence, output_probs)
         new_state._score += output_probs[0]  # higher is worse; so take prob of 0
+        new_state._data["score_seq"].append(new_state._score)
+
         new_state.last_output = "Score: {}".format(output_probs)
         return new_state
 
 
 class LMQualityOverlapChecker(LMClassifier, ParticipantModel):
 
-    def __init__(self, **kwargs):
+    def __init__(self, repeat_ok=False, score_answers=True, **kwargs):
+        self.repeat_ok = repeat_ok
+        self.score_answers = score_answers
         super(LMQualityOverlapChecker, self).__init__(**kwargs)
 
     def query(self, state, debug=False):
@@ -169,8 +174,8 @@ class LMQualityOverlapChecker(LMClassifier, ParticipantModel):
         if qchain[-1] == "[EOQ]":
             new_qchain.pop(-1)
         new_tok_score, missed_tok_score, new_toks, missed_toks, unmatched_answers = \
-            score_question_answer_chain(new_qchain, achain, origq, repeat_ok=False,
-                                        score_answers=True)
+            score_question_answer_chain(new_qchain, achain, origq, repeat_ok=self.repeat_ok,
+                                        score_answers=self.score_answers)
         if qchain[-1] == "[EOQ]":
             # check for correct usage of answers
             if unmatched_answers > 0:
@@ -224,4 +229,5 @@ class DualLMQualityChecker(ParticipantModel):
 
         new_state.last_output = "Score: {}".format(output_probs)
         new_state._score += output_probs[0]
+        new_state._data["score_seq"].append(new_state._score)
         return new_state

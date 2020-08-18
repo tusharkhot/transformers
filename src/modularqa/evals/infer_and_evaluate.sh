@@ -2,11 +2,11 @@
 
 set -e
 
-L=$L N=$N P=$P K=$K B=$B DS=$DS DLOAD=$DLOAD HLOAD=$HLOAD SLOAD=$SLOAD envsubst < /configs/config.json > ${OUTPUT}/new_config.json
+L=$L N=$N P=$P K=$K B=$B DS=$DS DLOAD=$DLOAD HLOAD=$HLOAD SLOAD=$SLOAD REPOK=$REPOK envsubst < /configs/config.json > ${OUTPUT}/new_config.json
 
 set +e
 # for some reason, ends with segfault when threads > 1
-python -m modularqa.inference.configurable_inference \
+python -u -m modularqa.inference.configurable_inference \
         --input $INPUT/$FILE \
         --output $OUTPUT/predictions_$FILE \
         --config ${OUTPUT}/new_config.json --reader $DATASET --threads $THREAD

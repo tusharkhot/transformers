@@ -36,9 +36,12 @@ class ModelRouter(ParticipantModel):
             new_state._next = send_to
         else:
             print("Question didn't match format!: {}".format(question))
-            # new_state = state.copy()
-            # new_state._score = float('inf')
-            return []
+            new_state = state.copy()
+            new_state._score = float('inf')
+            new_state._data["model_seq"].append("N/A")
+            new_state._data["answer_seq"].append("N/A")
+            new_state._data["command_seq"].append("route")
+            return [new_state]
 
         return [new_state]
 
@@ -150,6 +153,13 @@ class LMQAParticipant(LMQuestionAnswerer, ParticipantModel):
             else:
                 new_state._next = "gen"
             new_states.append(new_state)
+        if len(new_states) == 0:
+            new_state = state.copy()
+            new_state._data["answer_seq"].append("N/A")
+            new_state._data["para_seq"].append("")
+            new_state._data["command_seq"].append("qa")
+            new_state._score = float('inf')
+            return [new_state]
 
         return new_states
 

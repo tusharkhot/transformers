@@ -171,7 +171,7 @@ class MathQAParticipant(MathQA, ParticipantModel):
 
         ### run the model (as before)
         if debug: print("<MATHQA>: %s, qid=%s" % (question, qid))
-        answer = self.answer_question(question)
+        answer = self.answer_question(question, [])
         if debug:
             print("<MathQA> Ans: {}".format(answer))
         if answer == "":

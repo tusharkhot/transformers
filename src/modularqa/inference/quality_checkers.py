@@ -185,11 +185,11 @@ class LMQualityOverlapChecker(LMClassifier, ParticipantModel):
                 output_probs = self.score_sequence(sequence1=sequence)
                 # add 10 to ensure that the overlap scores are always lower
                 new_state._score += 10 * output_probs[0]  # higher is worse; so take prob of 0
-                new_state["score_seq"].append(new_state._score)
+                new_state._data["score_seq"].append(new_state._score)
                 new_state.last_output = "Score: {}".format(output_probs)
         else:
             new_state._score = new_tok_score
-            new_state["score_seq"].append(new_state._score)
+            new_state._data["score_seq"].append(new_state._score)
             new_state.last_output = "Overlap Score: {}".format(new_state._score)
 
         return new_state

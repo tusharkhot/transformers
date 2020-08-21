@@ -2,14 +2,16 @@ from typing import Dict
 
 from modularqa.inference.dataset_readers import HotpotQAReader, DatasetReader, DropReader
 from modularqa.inference.participant_qa import LMQAParticipant, MathQAParticipant, \
-    ModelRouter, BoolQAParticipant
-from modularqa.inference.participant_qgen import LMGenParticipant
+    ModelRouter, BoolQAParticipant, DecompRCQA
+from modularqa.inference.participant_qgen import LMGenParticipant, DecompRCGenParticipant
 from modularqa.inference.quality_checkers import QualityCheckerExample, ChainOverlapScorer, \
     LMQualityChecker, LMQualityOverlapChecker, DualLMQualityChecker
 
 MODEL_NAME_CLASS = {
     "lmgen": LMGenParticipant,
+    "decompgen": DecompRCGenParticipant,
     "lmqa": LMQAParticipant,
+    "decompqa": DecompRCQA,
     "qual_example": QualityCheckerExample,
     "qual_overlap": ChainOverlapScorer,
     "qual_lm": LMQualityChecker,

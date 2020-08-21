@@ -4,6 +4,7 @@ import string
 
 from modularqa.con_gen.constraints import QAConstraint
 from modularqa.inference.model_search import ParticipantModel
+from modularqa.utils.decomprc.onehop_bertrc import OneHopBertRC
 from modularqa.utils.math_qa import MathQA
 from modularqa.utils.qa import LMQuestionAnswerer, BoolQuestionAnswerer
 
@@ -240,3 +241,58 @@ class BoolQAParticipant(BoolQuestionAnswerer, ParticipantModel):
         new_state._next = "gen"
 
         return [new_state]
+
+
+
+class DecompRCQA(OneHopBertRC, ParticipantModel):
+
+    def query(self, state, debug=False):
+        """The main function that interfaces with the overall search and
+        model controller, and manipulates the incoming data.
+
+        :param state: the state of controller and model flow.
+        :type state: launchpadqa.question_search.model_search.SearchState
+        :rtype: list
+        """
+        ## the data
+        data = state._data
+        question = data["question_seq"][-1]
+        qid = data["qid"]
+
+        ### run the model (as before)
+        if debug: print("<DECOMPQA>: %s, qid=%s" % (question, qid))
+        model_output = self.answer_question_only(question=question, qid=qid)
+        new_states = []
+        for bert_out in model_output:
+            if bert_out.answer == "":
+                continue
+            if debug:
+                print("<DECOMPQA> Ans: {} Score: {} Para: {}".format(bert_out.answer,
+                                                                   bert_out.score,
+                                                                   bert_out.para_text[:15]))
+            # copy state
+            new_state = state.copy()
+
+            ## add score
+            # new_state._score += bert_out.score
+            ## strip unnecessary punctuations
+            answer = bert_out.answer.strip(string.punctuation)
+            if re.match("^[0-9,.]+$", answer):
+                answer = answer.replace(",", "")
+            new_state._data["answer_seq"].append(answer)
+            new_state._data["para_seq"].append(bert_out.para_text)
+
+            ## add initial question + answer as tuple to `question_seq`
+            # new_state._data["question_seq"][-1] = (question, bert_out.answer)
+            new_state._data["command_seq"].append("qa")
+
+            ## change output
+            new_state.last_output = answer
+
+            ## determine next state based on
+            if len(new_state._data["answer_seq"]) >= max_answers:
+                new_state._next = "EOQ"
+            else:
+                new_state._next = "gen"
+            new_states.append(new_state)
+        return new_states

@@ -73,6 +73,12 @@ if __name__ == "__main__":
             if final_state is None:
                 print("FAILED!")
             else:
+                if args.debug:
+                    for other_state in other_states:
+                        data = other_state._data
+                        for q, a, s in zip(data["question_seq"], data["answer_seq"], data["score_seq"]):
+                            print("Q: {} A: {} S:{}".format(q, a, s), end='\t')
+                        print("Score: " + str(other_state._score))
                 data = final_state._data
                 chain = example["question"]
                 for q, a in zip(data["question_seq"], data["answer_seq"]):
@@ -88,7 +94,7 @@ if __name__ == "__main__":
                                     reader.read_examples(args.input))
         else:
             for example in reader.read_examples(args.input):
-                output_json.append(decomposer.return_qid_prediction(example))
+                output_json.append(decomposer.return_qid_prediction(example, debug=args.debug))
 
         with open(args.output, "w") as output_fp:
             json.dump(dict(output_json), output_fp)

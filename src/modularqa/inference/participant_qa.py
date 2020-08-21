@@ -246,6 +246,10 @@ class BoolQAParticipant(BoolQuestionAnswerer, ParticipantModel):
 
 class DecompRCQA(OneHopBertRC, ParticipantModel):
 
+    def __init__(self, max_answers=1, **kwargs):
+        self.max_answers = max_answers
+        super(DecompRCQA, self).__init__(**kwargs)
+
     def query(self, state, debug=False):
         """The main function that interfaces with the overall search and
         model controller, and manipulates the incoming data.
@@ -261,7 +265,7 @@ class DecompRCQA(OneHopBertRC, ParticipantModel):
 
         ### run the model (as before)
         if debug: print("<DECOMPQA>: %s, qid=%s" % (question, qid))
-        model_output = self.answer_question_only(question=question, qid=qid)
+        model_output = self.answer_question_only(question=question, qid=qid)[:self.max_answers]
         new_states = []
         for bert_out in model_output:
             if bert_out.answer == "":

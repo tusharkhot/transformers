@@ -62,7 +62,7 @@ class OneHopBertRC:
         """
         paragraphs = self.retriever.retrieve_paragraphs(qid, question)
         return self.answer_question(question, paragraphs, normalize=normalize,
-                                    num_ans=num_ans)
+                                    num_ans_para=num_ans)
 
     def answer_question(self, question: str,
                         paragraphs: List[str],

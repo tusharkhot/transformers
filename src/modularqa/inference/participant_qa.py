@@ -267,6 +267,7 @@ class DecompRCQA(OneHopBertRC, ParticipantModel):
         if debug: print("<DECOMPQA>: %s, qid=%s" % (question, qid))
         model_output = self.answer_question_only(question=question, qid=qid)[:self.max_answers]
         new_states = []
+        max_answers = 4
         for bert_out in model_output:
             if bert_out.answer == "":
                 continue

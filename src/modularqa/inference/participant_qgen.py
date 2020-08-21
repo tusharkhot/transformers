@@ -1,6 +1,7 @@
 import json
 from math import ceil
 
+from modularqa.con_gen.constants import SQUAD_MODEL
 from modularqa.inference.model_search import ParticipantModel
 from modularqa.utils.generation import LMGenerator
 from modularqa.utils.seq_utils import get_sequence_representation
@@ -67,11 +68,67 @@ class DecompRCGenParticipant(ParticipantModel):
         self.decompositions = self.load_decomp_file(decomp_file)
 
     def load_decomp_file(self, file):
-        with input(file, "r") as input_fp:
+        qid_to_reasoning_map = {}
+        with open(file, "r") as input_fp:
             input_json = json.load(input_fp)
+            for key, value in input_json.items():
+                if key in qid_to_reasoning_map:
+                    print("Multiple reasonings for qid: {}".format(key))
+                else:
+                    qid_to_reasoning_map[key] = []
 
-        return None
+                qid_to_reasoning_map[key].append({
+                    "reasoning": value["reasoning"],
+                    "queries": value["queries"]
+                })
+        return qid_to_reasoning_map
 
     def query(self, state, debug=False):
-        raise NotImplementedError()
-        return None
+        ## first checks state of `json_input` to figure out how to format things
+        ## the first question
+        data = state._data
+        question_seq = data["question_seq"]
+        answer_seq = data["answer_seq"]
+        model_seq = data["model_seq"]
+        qid = data["qid"]
+        if debug: print("<DecompRCGen>: %s" % qid)
+
+        ## eventual output
+        new_states = []
+        if qid not in self.decompositions:
+            print("No decompositions for {}".format(qid))
+            return []
+        ## go through generated questions
+        for reasoning in list(self.decompositions[qid]):
+            if reasoning["queries"] is None:
+                # one hop question
+                if len(question_seq) == 0:
+                    curr_query = "(" + SQUAD_MODEL + ") " + data["question"]
+                else:
+                    curr_query = "[EOQ]"
+            elif len(question_seq) == len(reasoning["queries"]) - 1:
+                # end of reasoning
+                curr_query = "[EOQ]"
+            else:
+                curr_query = reasoning["queries"][len(question_seq)+1]
+                if curr_query.isupper():
+                    # Comparison. Can't handle right now
+                    print("Failed on question: {}".format(curr_query))
+                    return []
+
+                if "[answer]" in curr_query:
+                    curr_query = curr_query.replace("[answer]", answer_seq[-1])
+                curr_query = "(" + SQUAD_MODEL + ") " + curr_query
+            # copy state
+            new_state = state.copy()
+            ## add new question to question_seq
+            new_state._data["question_seq"].append(curr_query)
+            ## specify that in this case, the qa model should come next in this case
+            new_state._next = "qa"
+            new_state._data["command_seq"].append("gen")
+            ## mark the last output
+            new_state.last_output = json.dumps(reasoning)
+
+            new_states.append(new_state)
+        ##
+        return new_states

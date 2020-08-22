@@ -214,8 +214,16 @@ class OneHopBertRC:
                             logit=score, no_answer_logit=result.switch[3]))
 
             predictions = []
+            para_predictions = {}
             for pred in sorted(prelim_predictions, key=lambda x: x.logit, reverse=True):
                 feature = example_index_to_features[example_index][pred.feature_index]
+                para = " ".join(feature.doc_tokens)
+                # keep processing other para predictions
+                if para in para_predictions:
+                    if para_predictions[para] == num_ans_para:
+                        continue
+                else:
+                    para_predictions[para] = 0
 
                 if pred.start_index == pred.end_index == -1:
                     final_text = "yes"
@@ -246,11 +254,9 @@ class OneHopBertRC:
                     sp_fact = " ".join(feature.doc_tokens[:orig_doc_start] + ["@@"] + \
                                        orig_tokens + ["@@"] + feature.doc_tokens[orig_doc_end + 1:])
 
-                predictions.append({'text': final_text, 'logit': pred.logit, 'para': sp_fact})
-                if len(predictions) == num_ans_para:
-                    # print(predictions)
-                    # print("breaking" + str(num_ans_para))
-                    break
+                predictions.append({'text': final_text, 'logit': pred.logit, 'para': sp_fact,
+                                    'noans': pred.no_answer_logit})
+                para_predictions[para] += 1
             predictions_list.append(predictions)
             # print(predictions_list)
         return predictions_list
@@ -318,13 +324,13 @@ def get_final_text(pred_text, orig_text, do_lower_case=True):
 
 
 if __name__ == "__main__":
-    q = "What title does Obama hold?"
-    p = "Obama is the president of USA."
+    q = "What is McCain's job?"
+    p = ["Obama is the president of USA.", "Obama is a senator", "Biden is an actor."]
     model_path = sys.argv[1]
     config_path = sys.argv[2]
     vocab_file = sys.argv[3]
     onehopqa = OneHopBertRC(model_path=model_path, config_path=config_path, vocab_path=vocab_file,
-                            num_ans_para=1)
-    preds = onehopqa.answer_question(question=q, paragraphs=[p])
+                            num_ans_para=2)
+    preds = onehopqa.answer_question(question=q, paragraphs=p)
     for pred in preds:
         print(pred)

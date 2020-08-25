@@ -60,7 +60,17 @@ class LMGenerator:
         if top_samples is not None:
             # lowest score at the top
             sorted_outputs = sorted(zip(*outputs), key=lambda x: x[1])
-            topk_outputs = sorted_outputs[:self.top_samples]
+            topk_outputs = []
+            unique_output = set()
+            for (output, score) in sorted_outputs:
+                # add new output
+                if output not in unique_output:
+                    topk_outputs.append((output, score))
+                    unique_output.add(output)
+                    # stop once you have top_samples
+                    if len(topk_outputs) >= top_samples:
+                        break
+
             outputs = list(zip(*topk_outputs))
         return outputs
 

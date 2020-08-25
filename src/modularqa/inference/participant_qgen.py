@@ -39,8 +39,12 @@ class LMGenParticipant(LMGenerator, ParticipantModel):
         ## eventual output
         new_states = []
         num_samples = ceil(self.num_samples * pow((1 / self.scale_by_step), len(answer_seq)))
+        if self.top_samples:
+            top_samples = ceil(self.top_samples * pow((1 / self.scale_by_step), len(answer_seq)))
         ## go through generated questions
-        output_seqs, output_scores = self.generate_sequences(gen_seq, num_samples=num_samples)
+        output_seqs, output_scores = self.generate_sequences(gen_seq,
+                                                             num_samples=num_samples,
+                                                             top_samples=top_samples)
         for output in list(set(output_seqs)):
             output = output.strip()
             # copy state

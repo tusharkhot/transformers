@@ -20,6 +20,7 @@ class LMGenerator:
                  model_type=None,
                  length=30,
                  num_samples=20,
+                 top_samples=None,
                  top_p=0.9,
                  top_k=None,
                  num_beams=None,
@@ -39,10 +40,13 @@ class LMGenerator:
         self.num_beams = num_beams
         self.add_bos = add_bos
         self.do_sample = do_sample
+        self.top_samples = top_samples
 
-    def generate_sequences(self, sequence, num_samples=None):
+    def generate_sequences(self, sequence, num_samples=None, top_samples=None):
         if num_samples is None:
             num_samples = self.num_samples
+        if top_samples is None:
+            top_samples = self.top_samples
         outputs = generate_text_sequence(model=self.model, prompt_text=sequence,
                                          model_type=self.model_type,
                                          length=self.length,
@@ -53,6 +57,11 @@ class LMGenerator:
                                          num_beams=self.num_beams, do_sample=self.do_sample,
                                          tokenizer=self.tokenizer, device=self.device)
 
+        if top_samples is not None:
+            # lowest score at the top
+            sorted_outputs = sorted(zip(*outputs), key=lambda x: x[1])
+            topk_outputs = sorted_outputs[:self.top_samples]
+            outputs = (topk_outputs[0], topk_outputs[1])
         return outputs
 
     @staticmethod
@@ -105,7 +114,7 @@ def generate_text_sequence(model, tokenizer, model_type, prompt_text, device,
         max_len = length
     else:
         max_len = length + len(encoded_prompt[0])
-    output_sequences = model.generate(
+    output_sequences, output_scores = model.generate(
         input_ids=encoded_prompt,
         max_length=max_len,
         temperature=temperature,
@@ -142,4 +151,4 @@ def generate_text_sequence(model, tokenizer, model_type, prompt_text, device,
 
         generated_sequences.append(text)
 
-    return generated_sequences
+    return generated_sequences, output_scores

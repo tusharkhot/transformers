@@ -108,7 +108,7 @@ class LMQuestionGenerator(QuestionGenerator):
                 if sequence in self.cached_questions and g == 0:
                     return self.cached_questions[sequence]
                 num_samples = math.ceil(self.qgen_model.num_samples / self.sample_hints_groups)
-                outputs = self.qgen_model.generate_sequences(sequence, num_samples)
+                outputs, scores = self.qgen_model.generate_sequences(sequence, num_samples)
                 output_seqs.extend([o for o in outputs if len(o)])
                 output_seqs = list(set(output_seqs))
 

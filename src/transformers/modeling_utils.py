@@ -19,6 +19,7 @@ import logging
 import os
 from typing import Callable, Dict, Iterable, List, Optional, Tuple
 
+import numpy
 import torch
 from torch import Tensor, device, dtype, nn
 from torch.nn import CrossEntropyLoss
@@ -1220,9 +1221,8 @@ class PreTrainedModel(nn.Module, ModuleUtilsMixin):
         # length of generated sentences / unfinished sentences
         unfinished_sents = input_ids.new(batch_size).fill_(1)
         sent_lengths = input_ids.new(batch_size).fill_(max_length)
-
         past = encoder_outputs  # defined for encoder-decoder models, None for decoder-only models
-
+        decoded_probs = -1.0 * torch.ones((batch_size, 1), dtype=torch.float, device=input_ids.device)
         while cur_len < max_length:
             model_inputs = self.prepare_inputs_for_generation(
                 input_ids, past=past, attention_mask=attention_mask, use_cache=use_cache, **model_specific_kwargs
@@ -1268,17 +1268,20 @@ class PreTrainedModel(nn.Module, ModuleUtilsMixin):
                 next_token = torch.multinomial(probs, num_samples=1).squeeze(1)
             else:
                 # Greedy decoding
+                probs = F.softmax(next_token_logits, dim=-1)
                 next_token = torch.argmax(next_token_logits, dim=-1)
-
+            next_token_probs = torch.gather(probs, dim=1, index=next_token.unsqueeze(-1)).squeeze(-1)
             # update generations and finished sentences
             if eos_token_id is not None:
                 # pad finished sentences if eos_token_id exist
                 tokens_to_add = next_token * unfinished_sents + (pad_token_id) * (1 - unfinished_sents)
             else:
                 tokens_to_add = next_token
+            scores_to_add = next_token_probs * unfinished_sents + (-1) * (1 - unfinished_sents)
 
             # add token and increase length by one
             input_ids = torch.cat([input_ids, tokens_to_add.unsqueeze(-1)], dim=-1)
+            decoded_probs = torch.cat([decoded_probs, scores_to_add.unsqueeze(-1)], dim=-1)
             cur_len = cur_len + 1
 
             if eos_token_id is not None:
@@ -1306,11 +1309,15 @@ class PreTrainedModel(nn.Module, ModuleUtilsMixin):
             decoded = input_ids.new(batch_size, sent_lengths.max().item()).fill_(pad_token_id)
         else:
             decoded = input_ids
-
+        return_scores = []
         for hypo_idx, hypo in enumerate(input_ids):
             decoded[hypo_idx, : sent_lengths[hypo_idx]] = hypo[: sent_lengths[hypo_idx]]
+            scored_toks = [v.item() for v in decoded_probs[hypo_idx, :] if v != -1]
+            # To match beam search's negative scores. Lower is better
+            score = -1 * pow(numpy.prod(scored_toks), 1 / len(scored_toks))
+            return_scores.append(score)
 
-        return decoded
+        return decoded, return_scores
 
     def _generate_beam_search(
         self,
@@ -1556,15 +1563,18 @@ class PreTrainedModel(nn.Module, ModuleUtilsMixin):
         # select the best hypotheses
         sent_lengths = input_ids.new(output_batch_size)
         best = []
-
+        return_scores = []
         # retrieve best hypotheses
         for i, hypotheses in enumerate(generated_hyps):
             sorted_hyps = sorted(hypotheses.beams, key=lambda x: x[0])
             for j in range(output_num_return_sequences_per_batch):
                 effective_batch_idx = output_num_return_sequences_per_batch * i + j
-                best_hyp = sorted_hyps.pop()[1]
+                best_score_hyp = sorted_hyps.pop()
+                best_score = best_score_hyp[0]
+                best_hyp = best_score_hyp[1]
                 sent_lengths[effective_batch_idx] = len(best_hyp)
                 best.append(best_hyp)
+                return_scores.append(best_score)
 
         # shorter batches are filled with pad_token
         if sent_lengths.min().item() != sent_lengths.max().item():
@@ -1582,7 +1592,7 @@ class PreTrainedModel(nn.Module, ModuleUtilsMixin):
             assert (len(hypo) == max_length for hypo in best)
             decoded = torch.stack(best).type(torch.long).to(next(self.parameters()).device)
 
-        return decoded
+        return decoded, return_scores
 
     @staticmethod
     def _reorder_cache(past: Tuple, beam_idx: Tensor) -> Tuple[Tensor]:

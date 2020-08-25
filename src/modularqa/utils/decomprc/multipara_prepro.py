@@ -81,7 +81,6 @@ def get_dataloader(model, question, paragraphs, tokenizer, batch_size):
         max_seq_length = 100
     else:
         raise NotImplementedError()
-    print(len(examples))
     if model == 'span-predictor':
         curr_convert_examples_to_features = convert_examples_to_span_features
     else:

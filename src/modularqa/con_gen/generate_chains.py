@@ -65,7 +65,7 @@ def create_labelled_chains(output_json, generator_verifiers,
             else:
                 observed_sequences.add(current_sequence)
             # generate next question
-            sequences = decomposer_generator.generate_sequences(sequence=current_sequence)
+            sequences, scores = decomposer_generator.generate_sequences(sequence=current_sequence)
             sequences = list(set(sequences))
             predicted_questions = []
             predicted_sequences = []
@@ -120,7 +120,7 @@ def create_labelled_chains(output_json, generator_verifiers,
             current_sequence += INTERQ_MARKER + "(" + m + ") " + q + ANSWER_MARKER + a
         current_sequence += SIMPQ_MARKER
         # generate next question
-        sequences = decomposer_generator.generate_sequences(sequence=current_sequence)
+        sequences, scores = decomposer_generator.generate_sequences(sequence=current_sequence)
         sequences = list(set(sequences))
         for new_q in sequences:
             sequence = current_sequence + new_q

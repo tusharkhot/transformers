@@ -61,7 +61,7 @@ class LMGenerator:
             # lowest score at the top
             sorted_outputs = sorted(zip(*outputs), key=lambda x: x[1])
             topk_outputs = sorted_outputs[:self.top_samples]
-            outputs = (topk_outputs[0], topk_outputs[1])
+            outputs = list(zip(*topk_outputs))
         return outputs
 
     @staticmethod

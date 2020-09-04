@@ -343,7 +343,7 @@ class MathQuestionVerifier(QuestionVerifier):
         selected_answers: List[str] = []
         metadata = {"scored_questions": []}
         for question in questions:
-            pred_answer = self.math_qa.answer_question(question)
+            pred_answer = self.math_qa.answer_question(question, [])
             if qaconstraint.aconstraint.exp_ans_type == "number":
                 exp_ans_val = get_number(qaconstraint.aconstraint.exp_ans) \
                     if qaconstraint.aconstraint.exp_ans is not None else None

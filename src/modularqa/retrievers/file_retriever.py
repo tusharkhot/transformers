@@ -16,26 +16,6 @@ class FileRetriever(Retriever):
         if squad_file is not None:
             self._qid_doc_map.update(self.get_qid_doc_map_squad(squad_file))
 
-    def output_for_skiff_demo(self):
-        # OUTPUT FOR SKIFF DEMO
-        dropq_arr = [
-            ("5a87ab905542996e4f3088c1",
-             "The arena where the Lewiston Maineiacs played their home games can seat how many people?"),
-            ("5a80840f554299485f59863b",
-             "What WB supernatural drama series was Jawbreaker star Rose Mcgowan best known for being in?"),
-            ("a097cb28-cd2a-40f8-a860-28b38d0372a8",
-             "How many years after the Battle of Nieuwpoort did French forces first begin occupying the city?"),
-            ("17169f44-cb53-4809-9dc7-19872cc70480",
-             "How many months after 25 villages belonging to Memmingen rebelled were the Twelve Articles agreed on by the Upper Swabian Peasants Confederation?")
-        ]
-        output_json = []
-        for id, question in dropq_arr:
-            output_json.append({
-                "question": question,
-                "paragraphs": self.retrieve_paragraphs(id, question)
-            })
-        print(json.dumps(output_json, indent=2))
-
     def retrieve_paragraphs(self, qid, question):
         if qid in self.hard_coded_paras:
             return self.hard_coded_paras[qid]

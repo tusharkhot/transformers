@@ -335,8 +335,9 @@ class MathQuestionGenerator(QuestionGenerator):
                     metadata["error"] = "Not constraint should only one answer to count over!" \
                                         "{}".format(qaconstraint.qconstraint.to_str())
                     return [], metadata
-                potential_numbers = [get_number(previous_answers[aidx])
-                                     for aidx in qaconstraint.qconstraint.use_answer_idxs]
+
+                potential_numbers = self.get_potential_numbers(
+                    [previous_answers[aidx] for aidx in qaconstraint.qconstraint.use_answer_idxs])
             else:
                 potential_numbers = self.get_potential_numbers(previous_answers)
             filtered_numbers = [n for n in potential_numbers if get_number(n) <= 100]

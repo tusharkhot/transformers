@@ -41,6 +41,8 @@ class LMGenParticipant(LMGenerator, ParticipantModel):
         num_samples = ceil(self.num_samples * pow((1 / self.scale_by_step), len(answer_seq)))
         if self.top_samples:
             top_samples = ceil(self.top_samples * pow((1 / self.scale_by_step), len(answer_seq)))
+        else:
+            top_samples = None
         ## go through generated questions
         output_seqs, output_scores = self.generate_sequences(gen_seq,
                                                              num_samples=num_samples,

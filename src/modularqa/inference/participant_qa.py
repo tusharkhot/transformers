@@ -6,7 +6,7 @@ from modularqa.con_gen.constraints import QAConstraint
 from modularqa.inference.model_search import ParticipantModel
 from modularqa.utils.decomprc.onehop_bertrc import OneHopBertRC
 from modularqa.utils.math_qa import MathQA
-from modularqa.utils.qa import LMQuestionAnswerer, BoolQuestionAnswerer
+from modularqa.utils.qa import LMQuestionAnswerer, BoolQuestionAnswerer, QAAnswer
 
 
 class ModelRouter(ParticipantModel):
@@ -275,6 +275,87 @@ class DecompRCQA(OneHopBertRC, ParticipantModel):
                 print("<DECOMPQA> Ans: {} Score: {} Para: {}".format(bert_out.answer,
                                                                    bert_out.score,
                                                                    bert_out.para_text[:15]))
+            # copy state
+            new_state = state.copy()
+
+            ## add score
+            # new_state._score += bert_out.score
+            ## strip unnecessary punctuations
+            answer = bert_out.answer.strip(string.punctuation)
+            if re.match("^[0-9,.]+$", answer):
+                answer = answer.replace(",", "")
+            new_state._data["answer_seq"].append(answer)
+            new_state._data["para_seq"].append(bert_out.para_text)
+
+            ## add initial question + answer as tuple to `question_seq`
+            # new_state._data["question_seq"][-1] = (question, bert_out.answer)
+            new_state._data["command_seq"].append("qa")
+
+            ## change output
+            new_state.last_output = answer
+
+            ## determine next state based on
+            if len(new_state._data["answer_seq"]) >= max_answers:
+                new_state._next = "EOQ"
+            else:
+                new_state._next = "gen"
+            new_states.append(new_state)
+        return new_states
+
+
+class QAEnsemble(ParticipantModel):
+
+    def __init__(self, model_paths, max_answers, **kwargs):
+        self.max_answers = max_answers
+        self.qa_models = []
+        for model_path in model_paths.split(","):
+            self.qa_models.append(LMQuestionAnswerer(model_path=model_path, **kwargs))
+
+    def query(self, state, debug=False):
+        """The main function that interfaces with the overall search and
+        model controller, and manipulates the incoming data.
+
+        :param state: the state of controller and model flow.
+        :type state: launchpadqa.question_search.model_search.SearchState
+        :rtype: list
+        """
+        ## the data
+        data = state._data
+        question = data["question_seq"][-1]
+        qid = data["qid"]
+
+        ### run the model (as before)
+        if debug: print("<EnsembleQA>: %s, qid=%s" % (question, qid))
+        para_span_outputs = {}
+        for model in self.qa_models:
+            model_outputs = model.answer_question_only(question=question, qid=qid)
+            for output in model_outputs:
+                para = output.para_text
+                span = output.answer
+                if para not in para_span_outputs:
+                    para_span_outputs[para] = {}
+                if span not in para_span_outputs[para]:
+                    para_span_outputs[para][span] = []
+                para_span_outputs[para][span].append(output)
+        model_output = []
+        for para, span_outputs in para_span_outputs.items():
+            for span, outputs in span_outputs.items():
+                avg_score = sum([x.score for x in outputs])/len(outputs)
+                model_output.append(
+                    QAAnswer(answer_text=span, score=avg_score, para_text=para))
+        # here smaller score is better
+        model_output.sort(key=lambda x: x.score)
+        model_output = model_output[:self.max_answers]
+
+        new_states = []
+        max_answers = 4
+        for bert_out in model_output:
+            if bert_out.answer == "":
+                continue
+            if debug:
+                print("<EnsembleQA> Ans: {} Score: {} Para: {}".format(bert_out.answer,
+                                                                     bert_out.score,
+                                                                     bert_out.para_text[:15]))
             # copy state
             new_state = state.copy()
 

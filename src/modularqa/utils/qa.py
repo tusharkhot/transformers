@@ -93,7 +93,7 @@ class LMQuestionAnswerer:
     path_to_modeltokenizer = {}
 
     def __init__(self, model_path, model_type=None,
-                 only_gold_para=False, return_all_ans=False,
+                 only_gold_para=False, return_all_ans=False, subtract_null_odds=False,
                  seq_length=512, num_ans_para=1, single_para=False, merge_select_para=False,
                  return_unique_list=False, **kwargs):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -107,6 +107,7 @@ class LMQuestionAnswerer:
         self.return_unique_list = return_unique_list
         self.merge_select_para = merge_select_para
         self.return_all_ans = return_all_ans
+        self.subtract_null_odds = subtract_null_odds
         self.retriever = Retriever.load_retriever(**kwargs)
 
     @staticmethod
@@ -150,6 +151,7 @@ class LMQuestionAnswerer:
                                merge_select_para=self.merge_select_para,
                                normalize=normalize, return_all_ans=return_all_ans,
                                return_unique_list=self.return_unique_list,
+                               subtract_null_odds=self.subtract_null_odds,
                                single_para=self.single_para)
 
 
@@ -260,6 +262,7 @@ def answer_question(question: str,
                     normalize=False,
                     return_all_ans=False,
                     merge_select_para=False,
+                    subtract_null_odds=False,
                     return_unique_list=False) -> List[QAAnswer]:
     """
     Answer question using BERT
@@ -310,14 +313,26 @@ def answer_question(question: str,
     for key, predictions in prediction_json.items():
         # simple 'hack' to get the paragraph
         para = paragraphs[int(key)]
+        null_odds = None
+        if subtract_null_odds:
+            for pred in predictions:
+                if pred["text"] == "":
+                    null_odds = (pred["start_logit"] + pred["end_logit"])/2
+
         for pred in predictions:
             #print(pred["text"])
             # only consider answers upto "unanswerable" per para
             if not return_all_ans and (pred["text"] == "" or (pred["text"] == "empty" and pred["start_logit"] == 0)):
                 break
             else:
+                if subtract_null_odds:
+                    if null_odds is None:
+                        raise ValueError("Null odds not generated for question: {}".format(question))
+                    prob = (pred["start_logit"] + pred["end_logit"])/2
+                    prob = prob - null_odds
                 #prob = np.exp((pred["start_logit"] + pred["end_logit"])/2)
-                prob = pred["probability"]
+                else:
+                    prob = pred["probability"]
                 predicted_spans.append((pred["text"], prob, para))
 
     if len(predicted_spans):
@@ -328,7 +343,12 @@ def answer_question(question: str,
             # should have probability 1, there -log prob(1)  = 0
             denom = np.sum([ans.score for ans in answer_list])
             for ans in answer_list:
-                ans.score = -np.log(ans.score / denom)
+                ans.score = ans.score / denom
+        if subtract_null_odds:
+            # no need to apply log. Already using logit
+            # Hacky! Make this code more consistent
+            for ans in answer_list:
+                ans.score = -ans.score
         else:
             for ans in answer_list:
                 ans.score = -np.log(ans.score)

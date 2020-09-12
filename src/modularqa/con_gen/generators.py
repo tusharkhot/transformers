@@ -3,10 +3,12 @@ import math
 import random
 from collections import Counter
 from copy import deepcopy
-from dateutil.parser import parse
 from typing import Tuple, List, Dict, Any
 
-from modularqa.con_gen.constants import HINT_MARKER, HINTS_DELIM, ANSWER_MARKER, QUESTION_MARKER
+from dateutil.parser import parse
+
+from modularqa.con_gen.constants import HINT_MARKER, HINTS_DELIM, ANSWER_MARKER, QUESTION_MARKER, \
+    LIST_JOINER
 from modularqa.con_gen.constraints import QAConstraint
 from modularqa.drop.drop_utils import get_number, get_bool
 from modularqa.utils.generation import LMGenerator
@@ -127,9 +129,6 @@ class LMQuestionGenerator(QuestionGenerator):
 
 class MathQuestionGenerator(QuestionGenerator):
 
-    def __init__(self):
-        self.valid_operations = ["count", "diff", "not"]
-
     def get_potential_dates(self, previous_answers):
         if previous_answers is None:
             return []
@@ -178,15 +177,12 @@ class MathQuestionGenerator(QuestionGenerator):
                 potential_bools.append(num_val)
         return potential_bools
 
-
-    def make_predicate(self, predicate, args):
-        output = predicate  + "("
-        new_args = [str(a).replace(",", "") for a in args]
+    def make_predicate(self, predicate, args, comma_replace=""):
+        output = predicate + "("
+        new_args = [str(a).replace(",", comma_replace) for a in args]
         output += ", ".join(new_args)
         output += ")"
         return output
-
-
 
     def generate_questions(self, qaconstraint: QAConstraint,
                            previous_questions: List[str] = None,
@@ -210,13 +206,18 @@ class MathQuestionGenerator(QuestionGenerator):
         and_questions, and_metadata = self.generate_and_questions(qaconstraint, previous_questions,
                                                                   previous_answers)
 
+        intersect_questions, intersect_metadata = self.generate_intersect_questions(qaconstraint,
+                                                                                    previous_questions,
+                                                                                    previous_answers)
+
         question_list = count_questions + diff_questions + not_questions + ifthen_questions + and_questions
         metadata = {
             "count": count_metadata,
             "diff": diff_metadata,
             "not": not_metadata,
             "ifthen": ifthen_metadata,
-            "and": and_metadata
+            "and": and_metadata,
+            "intersect": intersect_metadata
         }
         if len(question_list) == 0:
             msg = "Cannot handle constraint: {} in math questions".format(qaconstraint.to_str())
@@ -258,6 +259,43 @@ class MathQuestionGenerator(QuestionGenerator):
             return [question], metadata
         return [], {}
 
+    def generate_intersect_questions(self, qaconstraint, previous_questions, previous_answers):
+        if "intersect" in qaconstraint.qconstraint.hints:
+            if qaconstraint.aconstraint.exp_ans_type != "span":
+                metadata = {
+                    "error": "Expected answer is not a span for an intersect operation!{}".format(
+                        qaconstraint.to_json())
+                }
+                return [], metadata
+            if previous_answers is None or len(previous_answers) == 0:
+                metadata = {
+                    "error": "Intersect operation has no previous answers!: {}".format(
+                        qaconstraint.to_str())
+                }
+                return [], metadata
+
+            potential_answers = []
+            if qaconstraint.qconstraint.use_answer_idxs:
+                if len(qaconstraint.qconstraint.use_answer_idxs) < 2:
+                    metadata = {
+                        "error": "Intersect constraint should have at least two answers to count over!"
+                                 "{}".format(qaconstraint.qconstraint.to_str())
+                    }
+                    return [], metadata
+                for ans_idx in qaconstraint.qconstraint.use_answer_idxs:
+                    if len(previous_answers) <= ans_idx:
+                        raise ValueError("Reference to unknown answer idx in constraint: {}".format(
+                            qaconstraint.qconstraint.to_str()))
+                    potential_answers.append(previous_answers[ans_idx])
+            else:
+                potential_answers = previous_answers
+            questions = []
+            answer_pairs = itertools.combinations(potential_answers, 2)
+            for answer_pair in answer_pairs:
+                questions.append(self.make_predicate("intersect", answer_pair,
+                                                     comma_replace=LIST_JOINER))
+            return questions, {}
+        return [], {}
 
     def get_comparable_pairs(self, use_answer_idxs, hints, previous_answers):
         if use_answer_idxs:
@@ -276,8 +314,7 @@ class MathQuestionGenerator(QuestionGenerator):
         date_pairs = itertools.combinations(potential_dates, 2)
 
         return ([p for p in number_pairs if self.valid_number_pair(p)],
-               [p for p in date_pairs if self.valid_date_pair(p)])
-
+                [p for p in date_pairs if self.valid_date_pair(p)])
 
     def generate_diff_questions(self, qaconstraint, previous_questions, previous_answers):
         if "difference" in qaconstraint.qconstraint.hints or "diff" in qaconstraint.qconstraint.hints:
@@ -297,7 +334,6 @@ class MathQuestionGenerator(QuestionGenerator):
                 units = "months"
             if "days" in qaconstraint.qconstraint.hints:
                 units = "days"
-
 
             comparable_num_pairs, comparable_date_pairs = self.get_comparable_pairs(
                 qaconstraint.qconstraint.use_answer_idxs,
@@ -375,7 +411,8 @@ class MathQuestionGenerator(QuestionGenerator):
                     "error": "Not enough bools to compute and"
                 }
                 return [], metadata
-            questions.append(self.make_predicate("and", [self.yes_no(p) for p in potential_bools[-2:]]))
+            questions.append(
+                self.make_predicate("and", [self.yes_no(p) for p in potential_bools[-2:]]))
             return questions, metadata
         return [], {}
 

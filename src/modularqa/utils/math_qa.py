@@ -7,6 +7,9 @@ from modularqa.drop.drop_utils import get_subspans, get_number, get_bool, parse_
 from dateutil.parser import parse
 from datetime import datetime
 
+from modularqa.utils.str_utils import tokenize_str
+
+
 class MathQA:
 
     def __init__(self):
@@ -17,7 +20,8 @@ class MathQA:
             "if_then_bool": self.answer_ifthen_bool_q,
             "if_then_str": self.answer_ifthen_str_q,
             "not": self.answer_not_q,
-            "and": self.answer_and_q
+            "and": self.answer_and_q,
+            "intersect": self.answer_intersect_q
         }
 
     @staticmethod
@@ -73,6 +77,20 @@ class MathQA:
             pred_spans = get_subspans(input_answer)
             pred_length = len(pred_spans)
         return str(pred_length)
+
+    def answer_intersect_q(self, question: str) -> str:
+        m = re.match("intersect\((.*), (.*)\)", question)
+        if m is None:
+            print("Can not parse question: {}".format(question))
+            return ""
+        span1 = m.group(1).strip()
+        span2 = m.group(1).strip()
+        span1_toks = tokenize_str(span1)
+        span2_toks = tokenize_str(span2)
+        shared_toks = set(span1_toks).intersection(set(span2_toks))
+        output_str = " ".join([tok for tok in span1_toks if tok in shared_toks])
+        return output_str
+
 
     def answer_and_q(self, question: str) -> str:
         m = re.match("and\((.*),(.*)\)", question)

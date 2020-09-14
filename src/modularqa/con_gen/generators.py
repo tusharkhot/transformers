@@ -210,7 +210,8 @@ class MathQuestionGenerator(QuestionGenerator):
                                                                                     previous_questions,
                                                                                     previous_answers)
 
-        question_list = count_questions + diff_questions + not_questions + ifthen_questions + and_questions
+        question_list = count_questions + diff_questions + not_questions + ifthen_questions + \
+                        and_questions + intersect_questions
         metadata = {
             "count": count_metadata,
             "diff": diff_metadata,

@@ -84,11 +84,11 @@ class MathQA:
             print("Can not parse question: {}".format(question))
             return ""
         span1 = m.group(1).strip()
-        span2 = m.group(1).strip()
-        span1_toks = tokenize_str(span1)
-        span2_toks = tokenize_str(span2)
+        span2 = m.group(2).strip()
+        span1_toks = tokenize_str(span1.lower())
+        span2_toks = tokenize_str(span2.lower())
         shared_toks = set(span1_toks).intersection(set(span2_toks))
-        output_str = " ".join([tok for tok in span1_toks if tok in shared_toks])
+        output_str = " ".join([tok for tok in tokenize_str(span1) if tok.lower() in shared_toks])
         return output_str
 
 
@@ -226,61 +226,69 @@ class MathQA:
 if __name__ == '__main__':
     math_qa = MathQA()
     question = "count(23-yd + 14 yd)"
-    answer = math_qa.answer_question(question)
+    answer = math_qa.answer_question(question, [])
     print("Q: {} \n A: {}".format(question, answer))
 
     question = "diff(25.0, 17.0)"
-    answer = math_qa.answer_question(question)
+    answer = math_qa.answer_question(question, [])
     print("Q: {} \n A: {}".format(question, answer))
 
     question = "diff(25.0 million, 17 thousand)"
-    answer = math_qa.answer_question(question)
+    answer = math_qa.answer_question(question, [])
     print("Q: {} \n A: {}".format(question, answer))
 
     question = "diff(7 May 1487, 18 August 1487)"
-    answer = math_qa.answer_question(question)
+    answer = math_qa.answer_question(question, [])
     print("Q: {} \n A: {}".format(question, answer))
 
     question = "diff(Jun 2 2011, 3rd Aug, days)"
-    answer = math_qa.answer_question(question)
+    answer = math_qa.answer_question(question, [])
     print("Q: {} \n A: {}".format(question, answer))
 
     question = "diff(7 May 1487, 18 August 1487, days)"
-    answer = math_qa.answer_question(question)
+    answer = math_qa.answer_question(question, [])
     print("Q: {} \n A: {}".format(question, answer))
 
     question = "diff(29 August 1942, 1 April 1943, months)"
-    answer = math_qa.answer_question(question)
+    answer = math_qa.answer_question(question, [])
     print("Q: {} \n A: {}".format(question, answer))
 
     question = "diff(August 1922, 30 March 1922, months)"
-    answer = math_qa.answer_question(question)
+    answer = math_qa.answer_question(question, [])
     print("Q: {} \n A: {}".format(question, answer))
 
 
     question = "if_then(23 > 15, Obama, Biden)"
-    answer = math_qa.answer_question(question)
+    answer = math_qa.answer_question(question, [])
     print("Q: {} \n A: {}".format(question, answer))
 
     question = "if_then(July 1918 > 1918, Obama, Biden)"
-    answer = math_qa.answer_question(question)
+    answer = math_qa.answer_question(question, [])
     print("Q: {} \n A: {}".format(question, answer))
 
     question = "not(.4)"
-    answer = math_qa.answer_question(question)
+    answer = math_qa.answer_question(question, [])
     print("Q: {} \n A: {}".format(question, answer))
 
     question = "diff(110, 40)"
-    answer = math_qa.answer_question(question)
+    answer = math_qa.answer_question(question, [])
     print("Q: {} \n A: {}".format(question, answer))
 
 
     question = "diff(20 March 1525, 16 February 1525, days)"
-    answer = math_qa.answer_question(question)
+    answer = math_qa.answer_question(question, [])
+    print("Q: {} \n A: {}".format(question, answer))
+
+    question="intersect(Anabolic steroids, anabolic-androgenic steroids)"
+    answer = math_qa.answer_question(question, [])
+    print("Q: {} \n A: {}".format(question, answer))
+
+    question="intersect(\"Steve Jobs\"., Steve Jobs.)"
+    answer = math_qa.answer_question(question, [])
     print("Q: {} \n A: {}".format(question, answer))
 
     question = "if_then(February 2008 < 6 March 2008," \
                " the election of Demetris Christofias as President," \
                " Garoyian becoming Speaker of the House of Representatives)"
-    answer = math_qa.answer_question(question)
+    answer = math_qa.answer_question(question, [])
     print("Q: {} \n A: {}".format(question, answer))

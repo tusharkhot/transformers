@@ -179,7 +179,7 @@ class MathQuestionGenerator(QuestionGenerator):
 
     def make_predicate(self, predicate, args, comma_replace=""):
         output = predicate + "("
-        new_args = [str(a).replace(",", comma_replace) for a in args]
+        new_args = [str(a).strip().strip(",").replace(",", comma_replace) for a in args]
         output += ", ".join(new_args)
         output += ")"
         return output

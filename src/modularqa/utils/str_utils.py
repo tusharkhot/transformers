@@ -46,7 +46,8 @@ def tokenize_question(question):
     for q in qtokens:
         num = get_number(q)
         # various mathqa operations and stemmed "yes"
-        if q in ["if_then", "if_then_str", "if_then_bool", "and", "diff", "not", "count", "ye"]:
+        if q in ["if_then", "if_then_str", "if_then_bool", "and", "diff", "not", "count", "ye",
+                 "intersect"]:
             continue
         if num is not None:
             out_tokens.append(str(num))

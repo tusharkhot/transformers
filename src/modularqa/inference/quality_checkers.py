@@ -39,8 +39,9 @@ class QualityCheckerExample(ParticipantModel):
 
 class ChainOverlapScorer(ParticipantModel):
 
-    def __init__(self, dump_chains=None, **kwargs):
+    def __init__(self, dump_chains=None, repeat_ok=False, **kwargs):
         self.dump_chains = dump_chains
+        self.repeat_ok = repeat_ok
         super(ChainOverlapScorer, self).__init__(**kwargs)
 
     def query(self, state, debug=False):
@@ -61,7 +62,7 @@ class ChainOverlapScorer(ParticipantModel):
             new_qchain = deepcopy(qchain)
             new_qchain.pop(-1)
             new_tok_score, missed_tok_score, new_toks, missed_toks, unmatched_answers = \
-                score_question_answer_chain(new_qchain, achain, origq, repeat_ok=False,
+                score_question_answer_chain(new_qchain, achain, origq, repeat_ok=self.repeat_ok,
                                             score_answers=True)
             if self.dump_chains:
                 sequence = get_sequence_representation(origq, qchain, achain, mchain,
@@ -82,7 +83,7 @@ class ChainOverlapScorer(ParticipantModel):
                 new_state._score = new_tok_score + missed_tok_score
         else:
             new_tok_score, missed_tok_score, new_toks, missed_toks = \
-                score_question_answer_chain(qchain, achain, origq, repeat_ok=False,
+                score_question_answer_chain(qchain, achain, origq, repeat_ok=self.repeat_ok,
                                             score_answers=False)
             new_state._score = new_tok_score
 
@@ -95,8 +96,9 @@ class ChainOverlapScorer(ParticipantModel):
 
 class LMQualityChecker(LMClassifier, ParticipantModel):
 
-    def __init__(self, dump_chains=None, **kwargs):
+    def __init__(self, repeat_ok=False, dump_chains=None, **kwargs):
         self.dump_chains = dump_chains
+        self.repeat_ok = repeat_ok
         super(LMQualityChecker, self).__init__(**kwargs)
 
     def query(self, state, debug=False):
@@ -122,7 +124,7 @@ class LMQualityChecker(LMClassifier, ParticipantModel):
             new_qchain = deepcopy(qchain)
             new_qchain.pop(-1)
             new_tok_score, missed_tok_score, new_toks, missed_toks, unmatched_answers = \
-                score_question_answer_chain(new_qchain, achain, origq, repeat_ok=False,
+                score_question_answer_chain(new_qchain, achain, origq, repeat_ok=self.repeat_ok,
                                             score_answers=True)
             if self.dump_chains:
                 with open(self.dump_chains, 'a') as chains_fp:

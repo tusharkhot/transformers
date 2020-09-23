@@ -235,15 +235,15 @@ class QuestionSearchBase(object):
         final_state, other_states = self.find_answer_decomp(example, debug=debug)
         if final_state is None:
             print(example["question"] + " FAILED!")
-            return (example["qid"], "")
+            return (example["qid"], "", "")
         else:
             data = final_state._data
-            chain = example["question"]
-            for q, a in zip(data["question_seq"], data["answer_seq"]):
-                chain += " Q: {} A: {}".format(q, a)
-            chain += " S: " + str(final_state._score)
+            chain = example["qid"] + "\t" + example["question"]
+            for m, q, a in zip(data["model_seq"], data["question_seq"], data["answer_seq"]):
+                chain += "\tQ: ({}) {} A: {}".format(m, q, a)
+            chain += "\tS: " + str(final_state._score)
             print(chain)
-            return (example["qid"], final_state._data["answer_seq"][-1])
+            return (example["qid"], final_state._data["answer_seq"][-1], chain)
 
 
 class DepthFirstSearch(QuestionSearchBase):

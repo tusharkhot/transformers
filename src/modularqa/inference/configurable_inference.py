@@ -58,7 +58,7 @@ if __name__ == "__main__":
 
 
     print("Running decomposer on examples")
-    output_json = []
+    qid_answer_chains = []
 
     if args.demo:
         while True:
@@ -90,11 +90,19 @@ if __name__ == "__main__":
             import multiprocessing as mp
             mp.set_start_method("spawn")
             with mp.Pool(args.threads) as p:
-                output_json = p.map(decomposer.return_qid_prediction,
-                                    reader.read_examples(args.input))
+                qid_answer_chains = p.map(decomposer.return_qid_prediction,
+                                          reader.read_examples(args.input))
         else:
             for example in reader.read_examples(args.input):
-                output_json.append(decomposer.return_qid_prediction(example, debug=args.debug))
+                qid_answer_chains.append(decomposer.return_qid_prediction(example, debug=args.debug))
 
+        predictions = {x[0]: x[1] for x in qid_answer_chains}
         with open(args.output, "w") as output_fp:
-            json.dump(dict(output_json), output_fp)
+            json.dump(predictions, output_fp)
+
+        chains = [x[2] for x in qid_answer_chains]
+        ext_index = args.output.rfind(".")
+        chain_tsv = args.output[:ext_index] + "_chains.tsv"
+        with open(chain_tsv, "w") as output_fp:
+            for chain in chains:
+                output_fp.write(chain + "\n")

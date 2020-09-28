@@ -17,7 +17,7 @@ def parse_arguments():
     arg_parser.add_argument('--input', type=str, required=True, help="Input JSON file")
     arg_parser.add_argument('--output', type=str, required=True, help="Output TXT file")
     arg_parser.add_argument('--config', type=str, required=True, help="Model configs")
-    arg_parser.add_argument('--ignore_answers', type=bool, action='store_true', required=False,
+    arg_parser.add_argument('--ignore_answers', action='store_true', required=False,
                             help="Ignore intermediate answers")
     arg_parser.add_argument('--max_new_score', type=float, required=False, default=-1.0,
                             help="Drop question chains in generation when new token score exceeds this threshold")

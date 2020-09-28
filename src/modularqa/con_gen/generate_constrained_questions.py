@@ -17,6 +17,8 @@ def parse_arguments():
     arg_parser.add_argument('--input', type=str, required=True, help="Input JSON file")
     arg_parser.add_argument('--output', type=str, required=True, help="Output TXT file")
     arg_parser.add_argument('--config', type=str, required=True, help="Model configs")
+    arg_parser.add_argument('--ignore_answers', type=bool, action='store_true', required=False,
+                            help="Ignore intermediate answers")
     arg_parser.add_argument('--max_new_score', type=float, required=False, default=-1.0,
                             help="Drop question chains in generation when new token score exceeds this threshold")
     return arg_parser.parse_args()
@@ -102,6 +104,9 @@ if __name__ == '__main__':
             output_json = deepcopy(input_json)
             for m, gen_ver in generator_verifiers.items():
                 gen_ver.reset_question_caches()
+            if args.ignore_answers:
+                for qaconstraint in output_json["constraints"]:
+                    qaconstraint["aconstraint"]["exp_ans"] = None
             output_json = create_question_chains(output_json, generator_verifiers)
             counter += 1
             if counter % 100 == 0:

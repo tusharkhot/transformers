@@ -105,7 +105,7 @@ if __name__ == '__main__':
             for m, gen_ver in generator_verifiers.items():
                 gen_ver.reset_question_caches()
             if args.ignore_answers:
-                for qaconstraint in output_json["constraints"]:
+                for qaconstraint in output_json["constraints"][:-1]:
                     qaconstraint["aconstraint"]["exp_ans"] = None
             output_json = create_question_chains(output_json, generator_verifiers)
             counter += 1

@@ -37,12 +37,13 @@ RUN apt-get update --fix-missing && apt-get install -y \
     gettext-base && \
     rm -rf /var/lib/apt/lists/*
 
+RUN pip install torch==1.5.0+cu101 -f https://download.pytorch.org/whl/torch_stable.html
+# RUN pip install torch==1.5.0
 RUN python3 -m pip install --no-cache-dir --upgrade pip && \
     python3 -m pip install --no-cache-dir \
     jupyter \
     mkl \
     tensorflow \
-    torch \
     tensorboard \
     sklearn \
     elasticsearch \

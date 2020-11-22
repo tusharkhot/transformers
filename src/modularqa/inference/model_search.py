@@ -235,7 +235,8 @@ class QuestionSearchBase(object):
         final_state, other_states = self.find_answer_decomp(example, debug=debug)
         if final_state is None:
             print(example["question"] + " FAILED!")
-            return (example["qid"], "", "")
+            chain = example["qid"] + "\t" + example["question"]
+            return (example["qid"], "", chain)
         else:
             data = final_state._data
             chain = example["qid"] + "\t" + example["question"]

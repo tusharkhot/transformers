@@ -146,7 +146,7 @@ class BreakLMGenParticipant(LMGenerator, ParticipantModel):
 
     def __init__(self, scale_by_step=1, **kwargs):
         self.scale_by_step = scale_by_step
-        super(LMGenParticipant, self).__init__(**kwargs)
+        super(BreakLMGenParticipant, self).__init__(**kwargs)
 
     def format_breakq(self, breakq, answers):
         m = re.match("\(([a-zA-Z]+)\) (.*)", breakq)

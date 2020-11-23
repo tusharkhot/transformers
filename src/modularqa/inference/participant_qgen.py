@@ -203,6 +203,7 @@ class BreakLMGenParticipant(LMGenerator, ParticipantModel):
             return None
         for idx in range(len(answers)):
             newq = newq.replace("#" + str(idx+1), answers[idx])
+        return newq
 
 
     def query(self, state, debug=False):

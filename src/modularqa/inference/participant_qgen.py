@@ -159,7 +159,7 @@ class BreakLMGenParticipant(LMGenerator, ParticipantModel):
             elif operation == "boolean":
                 if " same as " in question:
                     numbers = re.findall("#[0-9]+", question)
-                    if len(numbers == 2):
+                    if len(numbers) == 2:
                         newq = "({}) if_then_str({}!={}, no, yes)".format(MATH_MODEL,
                                                                           numbers[0], numbers[1])
                     else:
@@ -196,8 +196,10 @@ class BreakLMGenParticipant(LMGenerator, ParticipantModel):
                         return None
                 else:
                     print("Can not handle arithmetic operation in {}".format(breakq))
+                    return None
             else:
                 print("Can not handle operation: {} in {}".format(operation, breakq))
+                return None
         else:
             print("Could not parse question: {}".format(breakq))
             return None

@@ -1,7 +1,8 @@
 import json
 from math import ceil
-
-from modularqa.con_gen.constants import SQUAD_MODEL
+import re
+from modularqa.con_gen.constants import SQUAD_MODEL, MATH_MODEL
+from modularqa.drop.drop_utils import parse_number
 from modularqa.inference.model_search import ParticipantModel
 from modularqa.utils.generation import LMGenerator
 from modularqa.utils.seq_utils import get_sequence_representation
@@ -139,3 +140,130 @@ class DecompRCGenParticipant(ParticipantModel):
             new_states.append(new_state)
         ##
         return new_states
+
+
+class BreakLMGenParticipant(LMGenerator, ParticipantModel):
+
+    def __init__(self, scale_by_step=1, **kwargs):
+        self.scale_by_step = scale_by_step
+        super(LMGenParticipant, self).__init__(**kwargs)
+
+    def format_breakq(self, breakq, answers):
+        m = re.match("\(([a-zA-Z]+)\) (.*)", breakq)
+        if m:
+            operation = m.group(1)
+            question = m.group(2)
+            if operation == "select" or operation == "filter" or operation == "project":
+                question = question.replace("return ", "")
+                newq = "({}) {}".format(SQUAD_MODEL, question)
+            elif operation == "boolean":
+                if " same as " in question:
+                    numbers = re.findall("#[0-9]+", question)
+                    if len(numbers == 2):
+                        newq = "({}) if_then_str({}!={}, no, yes)".format(MATH_MODEL,
+                                                                          numbers[0], numbers[1])
+                    else:
+                        print("Need exactly two answers for if_then_str question: " + question)
+                        return None
+                else:
+                    print("Can not handle question: " + question)
+                    return None
+            elif operation == "arithmetic":
+                if " difference " in question:
+                    numbers = re.findall("#[0-9]+", question)
+                    unit = None
+                    if " year" in question:
+                        unit = "years"
+                    elif " day" in question:
+                        unit = "days"
+                    elif " month" in question:
+                        unit = "months"
+                    if len(numbers) == 1:
+                        tempq = question.replace(numbers[0], "")
+                        other_number = parse_number(tempq)
+                        if other_number:
+                            numbers.append(other_number)
+                    if len(numbers) == 2:
+                        if unit:
+                            newq = "({}) diff({}, {}, {})".format(MATH_MODEL,
+                                                                  numbers[0], numbers[1],
+                                                                  unit)
+                        else:
+                            newq = "({}) diff({}, {})".format(MATH_MODEL, numbers[0], numbers[1])
+                    else:
+                        print("Need exactly two answer for diff q. Found: {} in {}".format(
+                            numbers, question))
+                        return None
+                else:
+                    print("Can not handle arithmetic operation in {}".format(breakq))
+            else:
+                print("Can not handle operation: {} in {}".format(operation, breakq))
+        else:
+            print("Could not parse question: {}".format(breakq))
+            return None
+        for idx in range(len(answers)):
+            newq = newq.replace("#" + str(idx+1), answers[idx])
+
+
+    def query(self, state, debug=False):
+        """The main function that interfaces with the overall search and
+        model controller, and manipulates the incoming data.
+
+        :param data: should have a dictionary as input containing
+          mutable data
+        :type data: dict
+        :param state: the state of controller and model flow.
+        :type state: launchpadqa.question_search.model_search.SearchState
+        :rtype: list
+        :raises: ValueError
+        """
+        ## first checks state of `json_input` to figure out how to format things
+        ## the first question
+        data = state._data
+        question_seq = data["question_seq"]
+        answer_seq = data["answer_seq"]
+        model_seq = data["model_seq"]
+
+        # Representation for BREAK
+        gen_seq = " QC: " + data["query"]
+        if "break_seq" in data:
+            for q in data["break_seq"]:
+                gen_seq += " QI: " + q
+        gen_seq += " QS: "
+        if debug: print("<GPTGen>: %s" % gen_seq)
+
+        ## eventual output
+        new_states = []
+        num_samples = ceil(self.num_samples * pow((1 / self.scale_by_step), len(answer_seq)))
+        if self.top_samples:
+            top_samples = ceil(self.top_samples * pow((1 / self.scale_by_step), len(answer_seq)))
+        else:
+            top_samples = None
+        ## go through generated questions
+        output_seqs, output_scores = self.generate_sequences(gen_seq,
+                                                             num_samples=num_samples,
+                                                             top_samples=top_samples)
+        for output in list(set(output_seqs)):
+            output = output.strip()
+            # copy state
+            new_state = state.copy()
+            if "break_seq" not in new_state._data:
+                new_state._data["break_seq"] = []
+            new_state._data["break_seq"].append(output)
+            formatted_q = self.format_breakq(output, answer_seq)
+            if formatted_q is None:
+                continue
+            ## add new question to question_seq
+            new_state._data["question_seq"].append(formatted_q)
+            ## specify that in this case, the qa model should come next in this case
+            new_state._next = "qal"
+            ## maniuplate score (e.g., add)
+            # new_state._score += score
+            new_state._data["command_seq"].append("gen")
+            ## mark the last output
+            new_state.last_output = output
+
+            new_states.append(new_state)
+        ##
+        return new_states
+

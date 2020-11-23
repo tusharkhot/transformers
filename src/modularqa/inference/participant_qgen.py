@@ -253,9 +253,12 @@ class BreakLMGenParticipant(LMGenerator, ParticipantModel):
             if "break_seq" not in new_state._data:
                 new_state._data["break_seq"] = []
             new_state._data["break_seq"].append(output)
-            formatted_q = self.format_breakq(output, answer_seq)
-            if formatted_q is None:
-                continue
+            if output == "[EOQ]":
+                formatted_q = output
+            else:
+                formatted_q = self.format_breakq(output, answer_seq)
+                if formatted_q is None:
+                    continue
             ## add new question to question_seq
             new_state._data["question_seq"].append(formatted_q)
             ## specify that in this case, the qa model should come next in this case

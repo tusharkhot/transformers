@@ -22,8 +22,8 @@ class HotpotQAReader(DatasetReader):
                 # metadata
                 "answer": entry["answer"],
                 "question": entry["question"],
-                "type": entry["type"],
-                "level": entry["level"]
+                "type": entry.get("type", ""),
+                "level": entry.get("level", "")
             }
 
 

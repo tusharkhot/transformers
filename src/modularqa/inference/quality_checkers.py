@@ -42,6 +42,7 @@ class ChainOverlapScorer(ParticipantModel):
     def __init__(self, dump_chains=None, repeat_ok=False, **kwargs):
         self.dump_chains = dump_chains
         self.repeat_ok = repeat_ok
+        self.dump_partial = dump_partial
         super(ChainOverlapScorer, self).__init__(**kwargs)
 
     def query(self, state, debug=False):
@@ -86,6 +87,16 @@ class ChainOverlapScorer(ParticipantModel):
                 score_question_answer_chain(qchain, achain, origq, repeat_ok=self.repeat_ok,
                                             score_answers=False)
             new_state._score = new_tok_score
+            if self.dump_chains and self.dump_partial:
+                sequence = get_sequence_representation(origq, qchain, achain, mchain,
+                                                       for_generation=False)
+                with open(self.dump_chains, 'a') as chains_fp:
+                    if len(achain) == 0:
+                        ans = ""
+                    else:
+                        ans = achain[-1]
+                    chains_fp.write(data["qid"] + "\t" + sequence + "\t" + ans + "\t" +
+                                    "  ".join(data.get("para_seq")) + "\n")
 
         new_state._data["score_seq"].append(new_state._score)
         new_state.last_output = "Missed: {} New: {}".format(",".join(missed_toks),

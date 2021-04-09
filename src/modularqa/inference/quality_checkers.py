@@ -39,7 +39,7 @@ class QualityCheckerExample(ParticipantModel):
 
 class ChainOverlapScorer(ParticipantModel):
 
-    def __init__(self, dump_chains=None, repeat_ok=False, **kwargs):
+    def __init__(self, dump_chains=None, repeat_ok=False, dump_partial=False, **kwargs):
         self.dump_chains = dump_chains
         self.repeat_ok = repeat_ok
         self.dump_partial = dump_partial

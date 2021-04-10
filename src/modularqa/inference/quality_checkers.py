@@ -74,7 +74,7 @@ class ChainOverlapScorer(ParticipantModel):
                     else:
                         ans = achain[-1]
                     chains_fp.write(data["qid"] + "\t" + sequence + "\t" + ans + "\t" +
-                                    "  ".join(data.get("para_seq")) + "\n")
+                                    "$$".join(data.get("para_seq")) + "\n")
             if unmatched_answers > 0:
                 if debug:
                     print("Unmatched answers! Rejecting!"
@@ -96,7 +96,7 @@ class ChainOverlapScorer(ParticipantModel):
                     else:
                         ans = achain[-1]
                     chains_fp.write(data["qid"] + "\t" + sequence + "\t" + ans + "\t" +
-                                    "  ".join(data.get("para_seq")) + "\n")
+                                    "$$".join(data.get("para_seq")) + "\n")
 
         new_state._data["score_seq"].append(new_state._score)
         new_state.last_output = "Missed: {} New: {}".format(",".join(missed_toks),

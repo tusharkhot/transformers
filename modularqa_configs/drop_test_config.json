@@ -1,0 +1,37 @@
+{
+  "start_state": "gen",
+  "end_state": "EOQ",
+  "models": {
+    "gen": {
+      "name": "lmgen",
+      "model_path": "nextgen_model/",
+      "length": 40,
+      "num_samples": 15,
+      "top_p": 0.95,
+      "top_k": 10,
+      "do_sample": true,
+      "num_beams": null,
+      "scale_by_step": 2
+    },
+    "qa": {
+      "name": "model_router"
+    },
+    "squad": {
+      "name": "lmqa",
+      "model_path": "qa_model/",
+      "drop_file": "drop_subset/test.json",
+      "hotpotqa_file": null,
+      "squad_file": null,
+      "num_ans_para": 1,
+      "max_answers": 1
+    },
+    "qal":  {
+      "name": "qual_overlap_lm",
+      "model_path": "chain_scorer/",
+      "repeat_ok": false
+    },
+    "math": {
+      "name": "mathqa"
+    }
+  }
+}

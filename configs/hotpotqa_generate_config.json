@@ -12,5 +12,14 @@
       "model_path": "data/squad/bert_output/",
       "single_para": true
     }
+  },
+  "math": {
+    "type": "basic",
+    "qgen": {
+      "type": "math_gen"
+    },
+    "qa": {
+      "type": "math_ver"
+    }
   }
 }

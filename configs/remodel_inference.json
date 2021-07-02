@@ -6,8 +6,9 @@
       "name": "lmgen",
       "model_path": "/gpt2_qsimp/",
       "length": 40,
-      "num_samples": 10,
+      "num_samples": 5,
       "top_p": 0.95,
+      "top_k": 10,
       "do_sample": true,
       "num_beams": null,
       "scale_by_step": 2
@@ -15,21 +16,13 @@
     "qa": {
       "name": "model_router"
     },
-    "squad": {
-      "name": "lmqa",
-      "model_path": "/bert_qa/",
-      "single_para": false,
-      "hotpotqa_file": "/input/hotpot_train_hard.json",
-      "num_ans_para": 1,
-      "max_answers": 1
+    "execute": {
+      "name": "operation_executer",
+      "remodel_file": "/input/dev.json"
     },
     "qal":  {
       "name": "qual_overlap",
-      "repeat_ok": true,
       "dump_chains": "/output/chains.tsv"
-    },
-    "math": {
-      "name": "mathqa"
     }
   }
 }

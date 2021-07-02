@@ -6,7 +6,7 @@
       "name": "lmgen",
       "model_path": "/gpt2_qsimp/",
       "length": 40,
-      "num_samples": 5,
+      "num_samples": 10,
       "top_p": 0.95,
       "top_k": 10,
       "do_sample": true,
@@ -20,7 +20,7 @@
       "name": "lmqa",
       "model_path": "/bert_qa/",
       "single_para": false,
-      "drop_file": "/input/drop_dev_cdn_answerable_mydev.json",
+      "drop_file": "/input/drop_train_cdn_answerable.json",
       "num_ans_para": 1,
       "max_answers": 1
     },

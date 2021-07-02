@@ -7,22 +7,24 @@
       "model_path": "$MOD_DIR",
       "length": 40,
       "num_samples": 10,
-      "top_p": 0.95,
-      "top_k": 10,
-      "do_sample": true,
-      "num_beams": null,
-      "scale_by_step": 2
+      "top_p": 0.95
     },
     "qa": {
       "name": "model_router"
     },
     "squad": {
-      "name": "lmqa",
-      "model_path": "/bert_qa/",
-      "single_para": false,
+      "name": "ensembleqa",
+      "model_paths": "/bert_qa/roberta_large.hotpot_easy_and_squad.num_paragraphs=1/,/bert_qa/roberta_large.hotpot_easy_and_squad.num_paragraphs=3/",
       "hotpotqa_file": "/input/hotpot_mydev_hard.json",
       "num_ans_para": 1,
-      "max_answers": 1
+      "max_answers": 5
+    },
+    "squad": {
+      "name": "lmqa",
+      "model_path": "",
+      "single_para": false,
+      "hotpotqa_file": "/input/hotpot_mydev_hard.json",
+      "num_ans_para": 1
     },
     "qal":  {
       "name": "qual_overlap"

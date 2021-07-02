@@ -17,6 +17,7 @@
       "model_path": "../launchpadqa/data/squad/bert_output/",
       "single_para": true,
       "hotpotqa_file": "../launchpadqa/data/hotpotqa/hotpot_dev_distractor_v1.json",
+      "drop_file": "../launchpadqa/data/drop_inference_sets/drop_dataset_dev.json",
       "num_ans_para": 1
     },
     "qal":  {

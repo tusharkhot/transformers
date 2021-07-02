@@ -4,7 +4,7 @@
   "models": {
     "gen": {
       "name": "lmgen",
-      "model_path": "$MOD_DIR",
+      "model_path": "/gpt2_qsimp/",
       "length": 40,
       "num_samples": 10,
       "top_p": 0.95,
@@ -25,7 +25,8 @@
       "max_answers": 1
     },
     "qal":  {
-      "name": "qual_overlap"
+      "name": "qual_overlap",
+      "dump_chains": "/output/chains.tsv"
     },
     "math": {
       "name": "mathqa"

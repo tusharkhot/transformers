@@ -3,7 +3,7 @@
   "end_state": "EOQ",
   "models": {
     "gen": {
-      "name": "lmgen",
+      "name": "breakgen",
       "model_path": "/gpt2_qsimp",
       "length": $L,
       "num_samples": $N,

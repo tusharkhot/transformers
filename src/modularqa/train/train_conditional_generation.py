@@ -159,8 +159,16 @@ class ConditionalTextDataset(Dataset):
                 tokenized_lhs = tokenizer.convert_tokens_to_ids(tokenizer.tokenize(lhs_str))
                 tokenized_rhs = tokenizer.convert_tokens_to_ids(tokenizer.tokenize(rhs_str))
                 # DONT use padding token. Internal code uses that for masking
-                eos_token = config.eos_token_id or config.bos_token_id
-                decoder_start_token = config.decoder_start_token_id or config.bos_token_id or config.eos_token_id
+                if config.eos_token_id is not None:
+                    eos_token = config.eos_token_id
+                else:
+                    eos_token = config.bos_token_id
+                if config.decoder_start_token_id is not None:
+                    decoder_start_token = config.decoder_start_token_id
+                elif config.bos_token_id is not None:
+                    decoder_start_token = config.bos_token_id
+                else:
+                    decoder_start_token = config.eos_token_id
                 self._truncate_seq_pair(tokenized_lhs, tokenized_rhs,
                                         max_length=block_size - 1)
 

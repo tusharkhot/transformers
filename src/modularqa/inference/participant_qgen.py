@@ -10,8 +10,10 @@ from modularqa.utils.seq_utils import get_sequence_representation
 
 class LMGenParticipant(LMGenerator, ParticipantModel):
 
-    def __init__(self, scale_by_step=1, **kwargs):
+    def __init__(self, scale_by_step=1, add_eos=False, add_prefix="", **kwargs):
         self.scale_by_step = scale_by_step
+        self.add_eos = add_eos
+        self.add_prefix = add_prefix
         super(LMGenParticipant, self).__init__(**kwargs)
 
     def query(self, state, debug=False):
@@ -35,6 +37,11 @@ class LMGenParticipant(LMGenerator, ParticipantModel):
         gen_seq = get_sequence_representation(origq=data["query"], question_seq=question_seq,
                                               answer_seq=answer_seq, model_seq=model_seq,
                                               for_generation=True)
+        if self.add_prefix:
+            gen_seq = self.add_prefix + gen_seq
+        if self.add_eos:
+            gen_seq = gen_seq + "</s>"
+
         if debug: print("<GPTGen>: %s" % gen_seq)
 
         ## eventual output
@@ -50,6 +57,11 @@ class LMGenParticipant(LMGenerator, ParticipantModel):
                                                              top_samples=top_samples)
         for output in list(set(output_seqs)):
             output = output.strip()
+            if self.model_type == "t5":
+                # T5 does not produce "<"!
+                m = re.match(".* ([^ <]+>) .*", output)
+                if m:
+                    output = output.replace(m.group(1), "<" + m.group(1))
             # copy state
             new_state = state.copy()
             ## add new question to question_seq

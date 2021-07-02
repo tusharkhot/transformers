@@ -1,6 +1,7 @@
 ## generalizes version of `QuestionSearch.py` in this directory
 import copy
 import heapq
+import json
 import logging
 import sys
 from optparse import OptionParser
@@ -244,7 +245,16 @@ class QuestionSearchBase(object):
                 chain += "\tQ: ({}) {} A: {}".format(m, q, a)
             chain += "\tS: " + str(final_state._score)
             print(chain)
-            return (example["qid"], final_state._data["answer_seq"][-1], chain)
+            final_answer = data["answer_seq"][-1]
+            try:
+                json_answer = json.loads(final_answer)
+                # use this only if list (ignore numbers, etc)
+                if isinstance(json_answer, list):
+                    final_answer = json_answer
+            except ValueError:
+                # Not a valid json ignore
+                pass
+            return (example["qid"], final_answer, chain)
 
 
 class DepthFirstSearch(QuestionSearchBase):

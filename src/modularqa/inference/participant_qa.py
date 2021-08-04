@@ -55,10 +55,12 @@ class LMQAParticipant(LMQuestionAnswerer, ParticipantModel):
     in the controller.
     """
 
-    def __init__(self, max_answers=1, exp_ans_file=None, output_qa=None, **kwargs):
+    def __init__(self, max_answers=1, exp_ans_file=None, output_qa=None,
+                 add_score=False, **kwargs):
         self.max_answers = max_answers
         self.exp_ans_map = self.load_exp_ans(exp_ans_file) if exp_ans_file else None
         self.output_qa = output_qa
+        self.add_score = add_score
         super(LMQAParticipant, self).__init__(**kwargs)
 
     def load_exp_ans(self, exp_ans_file):
@@ -147,7 +149,8 @@ class LMQAParticipant(LMQuestionAnswerer, ParticipantModel):
 
             ## change output
             new_state.last_output = answer
-
+            if self.add_score:
+                new_state._score += bert_out.score/10
             ## determine next state based on
             if len(new_state._data["answer_seq"]) >= max_answers:
                 new_state._next = "EOQ"

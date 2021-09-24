@@ -25,6 +25,7 @@ class LMGenerator:
                  top_k=None,
                  num_beams=None,
                  add_bos=False,
+                 add_special_tokens=False,
                  temperature=1.0,
                  do_sample=True):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -41,6 +42,7 @@ class LMGenerator:
         self.add_bos = add_bos
         self.do_sample = do_sample
         self.top_samples = top_samples
+        self.add_special_tokens = add_special_tokens
 
     def generate_sequences(self, sequence, num_samples=None, top_samples=None):
         if num_samples is None:
@@ -54,6 +56,7 @@ class LMGenerator:
                                          temperature=self.temperature,
                                          top_k=self.top_k, top_p=self.top_p,
                                          add_bos=self.add_bos,
+                                         add_special_tokens=self.add_special_tokens,
                                          num_beams=self.num_beams, do_sample=self.do_sample,
                                          tokenizer=self.tokenizer, device=self.device)
 
@@ -106,7 +109,8 @@ class LMGenerator:
 
 def generate_text_sequence(model, tokenizer, model_type, prompt_text, device,
                            length=30, num_samples=1, temperature=1, top_k=None, num_beams=None,
-                           top_p=None, stop_token=None, add_bos=False, do_sample=True):
+                           top_p=None, stop_token=None, add_bos=False, add_special_tokens=False,
+                           do_sample=True):
     # Different models need different input formatting and/or extra arguments
     requires_preprocessing = model_type in PREPROCESSING_FUNCTIONS.keys()
     if requires_preprocessing:
@@ -114,7 +118,7 @@ def generate_text_sequence(model, tokenizer, model_type, prompt_text, device,
     else:
         if add_bos:
             prompt_text = tokenizer.bos_token + prompt_text
-        encoded_prompt = tokenizer.encode(prompt_text, add_special_tokens=False,
+        encoded_prompt = tokenizer.encode(prompt_text, add_special_tokens=add_special_tokens,
                                           max_length=tokenizer.max_len - length,
                                           verbose=False,
                                           return_tensors="pt")

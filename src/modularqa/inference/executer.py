@@ -1,7 +1,8 @@
 import json
 import re
-from modularqa.inference.model_search import ParticipantModel
+from json import JSONDecodeError
 
+from modularqa.inference.model_search import ParticipantModel
 
 pred_match = re.compile("(.*)\((.*)\)")
 
@@ -88,12 +89,12 @@ class OperationExecuter(ParticipantModel):
         assignment = {}
         for ans_idx, ans in enumerate(data["answer_seq"]):
             assignment["#" + str(ans_idx+1)] = json.loads(ans)
-        answers = self.execute_operation(model_library=model_lib,
-                                         operation=m.group(1),
-                                         model=m.group(2),
-                                         question=m.group(3),
-                                         assignments=assignment)
-        if len(answers) == 0:
+        answers, facts_used = self.execute_operation(model_library=model_lib,
+                                                     operation=m.group(1),
+                                                     model=m.group(2),
+                                                     question=m.group(3),
+                                                     assignments=assignment)
+        if isinstance(answers, list) and len(answers) == 0:
             return []
         # copy state
         new_state = state.copy()
@@ -115,75 +116,156 @@ class OperationExecuter(ParticipantModel):
         model_library = {}
         kblookup = KBLookup(kb=complete_kb)
         for model_name, configs in pred_lang_config.items():
-            model = ModelExecutor(predicate_language=configs,
+            if model_name == "math_special":
+                model = MathModel(predicate_language=configs,
                                   model_name=model_name,
                                   kblookup=kblookup)
+            else:
+                model = ModelExecutor(predicate_language=configs,
+                                      model_name=model_name,
+                                      kblookup=kblookup)
             model_library[model_name] = model
         return model_library
 
-    def execute_operation(self, model_library, operation, model, question, assignments):
-        if operation == "select":
-            assert model in model_library, "Model: {} not found in model library: {}".format(
-                model, model_library.keys())
-            return model_library[model].ask_question(question)
-        elif operation == "project" or operation == "project_flat" \
-                or operation == "project_flat_unique":
-            # print(question, assignments)
-            assert model in model_library, "Model: {} not found in model library!".format(
-                model)
-            indices = get_indices(question)
-            if len(indices) > 1:
-                raise NotImplementedError("Can not handle more than one answer idx for project!")
-            idx_str = "#" + str(indices[0])
+    def execute_select(self, operation, model, question, assignments):
+        assert model in self.model_library, "Model: {} not found in model library!".format(
+            model)
+        indices = get_indices(question)
+        for index in indices:
+            idx_str = "#" + str(index)
             if idx_str not in assignments:
                 raise ValueError("Can not perform project operation with input arg: {}"
                                  " No assignments yet!".format(idx_str))
-            answers = []
-            for item in assignments[idx_str]:
+            question = question.replace(idx_str, json.dumps(assignments[idx_str]))
+        answers, facts_used = self.model_library[model].ask_question(question)
+        if operation == "select_flat":
+            return list(set(answers)), facts_used
+        elif operation == "select":
+            return answers, facts_used
+        else:
+            raise ValueError("Unknown operation: {}".format(operation))
+
+    def execute_project(self, operation, model, question, assignments):
+        # print(question, assignments)
+        assert model in self.model_library, "Model: {} not found in model library!".format(
+            model)
+        indices = get_indices(question)
+        if len(indices) > 1:
+            raise NotImplementedError("Can not handle more than one answer idx for project!")
+        if len(indices) == 0:
+            raise ValueError("Did not find any indices to project on " + str(question))
+        idx_str = "#" + str(indices[0])
+        if idx_str not in assignments:
+            raise ValueError("Can not perform project operation with input arg: {}"
+                             " No assignments yet!".format(idx_str))
+        answers = []
+        facts_used = []
+        for item in assignments[idx_str]:
+            # print(question, idx_str, item, assignments[idx_str])
+            if operation == "project_values":
+                new_question = question.replace(idx_str, json.dumps(item[1]))
+            elif operation == "project_keys":
+                new_question = question.replace(idx_str, json.dumps(item[0]))
+            else:
                 new_question = question.replace(idx_str, item)
-                if operation == "project":
-                    answers.append(model_library[model].ask_question(new_question))
-                elif operation == "project_flat":
-                    answers.extend(model_library[model].ask_question(new_question))
-                elif operation == "project_flat_unique":
-                    answers.extend(model_library[model].ask_question(new_question))
-                    answers = list(set(answers))
-            return answers
-        elif operation == "filter":
-            assert model in model_library, "Model: {} not found in model library!".format(
-                model)
-            indices = get_indices(question)
+            curr_answers, curr_facts = self.model_library[model].ask_question(new_question)
+            facts_used.extend(curr_facts)
+            if operation == "project":
+                answers.append(curr_answers)
+            elif operation == "project_flat":
+                answers.extend(curr_answers)
+            elif operation == "project_flat_unique":
+                answers.extend(curr_answers)
+                answers = list(set(answers))
+            elif operation == "project_zip":
+                answers.append((item, curr_answers))
+            elif operation == "project_keys":
+                answers.append((curr_answers, item[1]))
+            elif operation == "project_values":
+                answers.append((item[0], curr_answers))
+            else:
+                raise ValueError("Unknown operation: {}".format(operation))
+        return answers, facts_used
+
+    def execute_filter(self, operation, model, question, assignments):
+        assert model in self.model_library, "Model: {} not found in model library!".format(
+            model)
+        indices = get_indices(question)
+        if len(indices) > 1:
+            # check which index is mentioned in the operation
+            question_indices = indices
+            indices = get_indices(operation)
             if len(indices) > 1:
-                raise NotImplementedError("Can not handle more than one answer idx for filter!")
-            idx_str = "#" + str(indices[0])
-            if idx_str not in assignments:
-                raise ValueError("Can not perform filter operation with input arg: {}"
-                                 " No assignments yet!".format(idx_str))
-            answers = []
-            for item in assignments[idx_str]:
-                if isinstance(item, list):
-                    # raise NotImplementedError("Assignment to {} is a list of lists: {}".format(
-                    #     idx_str, assignments[idx_str]
-                    # ))
-                    answers.append(self.execute_operation(model_library=model_library,
-                                                          operation=operation, model=model,
-                                                          question=question,
-                                                          assignments={idx_str: item}))
-                else:
-                    new_question = question.replace(idx_str, item)
-                    answer = self.model_library[model].ask_question(new_question).lower()
-                    if answer == "yes" or answer == "1" or answer == "true":
-                        answers.append(item)
-            return answers
+                raise NotImplementedError("Can not handle more than one answer idx for filter!"
+                                          "Operation: {} Question: {}".format(operation, question))
+            else:
+                for idx in question_indices:
+                    # modify question directly to include the other question indices
+                    if idx not in indices:
+                        idx_str = "#" + str(idx)
+                        if idx_str not in assignments:
+                            raise ValueError("Can not perform filter operation with input arg: {} "
+                                             "No assignments yet!".format(idx_str))
+                        # print(question, idx_str, assignments)
+                        question = question.replace(idx_str, json.dumps(assignments[idx_str]))
+
+        idx_str = "#" + str(indices[0])
+        if idx_str not in assignments:
+            raise ValueError("Can not perform filter operation with input arg: {}"
+                             " No assignments yet!".format(idx_str))
+        answers = []
+        facts_used = []
+        for item in assignments[idx_str]:
+            if operation.startswith("filter_keys"):
+                # item should be a tuple
+                (key, value) = item
+                new_question = question.replace(idx_str, json.dumps(value))
+                answer, curr_facts = self.model_library[model].ask_question(new_question)
+                answer = answer.lower()
+                if answer == "yes" or answer == "1" or answer == "true":
+                    answers.append(key)
+                facts_used.extend(curr_facts)
+            elif isinstance(item, list):
+                # raise NotImplementedError("Assignment to {} is a list of lists: {}".format(
+                #     idx_str, assignments[idx_str]
+                # ))
+                curr_answers, curr_facts = self.execute_operation(operation=operation, model=model,
+                                                                  question=question,
+                                                                  assignments={idx_str: item})
+                answers.append(curr_answers)
+                facts_used.extend(curr_facts)
+            else:
+                new_question = question.replace(idx_str, item)
+                answer, curr_facts = self.model_library[model].ask_question(new_question)
+                answer = answer.lower()
+                if answer == "yes" or answer == "1" or answer == "true":
+                    answers.append(item)
+                facts_used.extend(curr_facts)
+        return answers, facts_used
+
+    def execute_flatten(self, operation, model, question, assignments):
+        pred, args = get_predicate_args(question)
+        answers = []
+        for arg in args:
+            if arg not in assignments:
+                raise ValueError("Can not perform flatten operation with input arg: {}"
+                                 " No assignments yet!".format(arg))
+            answers.extend(flatten_list(assignments[arg]))
+        return answers, []
+
+    def execute_operation(self, operation, model, question, assignments):
+        if operation.startswith("select"):
+            return self.execute_select(operation, model, question, assignments)
+        elif operation.startswith("project"):
+            return self.execute_project(operation, model, question, assignments)
+        elif operation.startswith("filter"):
+            return self.execute_filter(operation, model, question, assignments)
         elif operation == "flatten":
-            pred, args = get_predicate_args(question)
-            answers = []
-            for arg in args:
-                if arg not in assignments:
-                    raise ValueError("Can not perform flatten operation with input arg: {}"
-                                     " No assignments yet!".format(arg))
-                answers.extend(flatten_list(assignments[arg]))
-            return answers
+            return self.execute_flatten(operation, model, question, assignments)
+        else:
+            print("Can not execute operation: {}. Returning empty list".format(operation))
+            return [], []
+
 
 
 class ModelExecutor:
@@ -296,6 +378,165 @@ class KBLookup:
                 return "yes"
         else:
             return answers
+
+
+class MathModel(ModelExecutor):
+
+    def __init__(self, **kwargs):
+        self.func_regex = {
+            "is_greater\((.+) \| (.+)\)": MathModel.greater_than,
+            "is_smaller\((.+) \| (.+)\)": MathModel.smaller_than,
+            "diff\((.+) \| (.+)\)": MathModel.diff,
+            "belongs_to\((.+) \| (.+)\)": MathModel.belongs_to,
+            "max\((.+)\)": MathModel.max,
+            "min\((.+)\)": MathModel.min,
+            "count\((.+)\)": MathModel.count
+
+        }
+        super(MathModel, self).__init__(**kwargs)
+
+    @staticmethod
+    def get_number(num):
+        try:
+            item = json.loads(num)
+        except JSONDecodeError:
+            print("Could not JSON parse: " + num)
+            raise
+        if isinstance(item, list):
+            if (len(item)) != 1:
+                raise ValueError("List of values instead of single number in {}".format(num))
+            item = item[0]
+        try:
+            return float(item)
+        except ValueError:
+            print("Could not parse float from: " + item)
+            raise
+
+    @staticmethod
+    def max(groups):
+        if len(groups) != 1:
+            raise ValueError("Incorrect regex for max. "
+                             "Did not find 1 group: {}".format(groups))
+        try:
+            entity = json.loads(groups[0])
+            if isinstance(entity, list):
+                numbers = [MathModel.get_number(x) for x in entity]
+            else:
+                print("max can only handle list of entities. Arg: " + str(entity))
+                return "", []
+        except JSONDecodeError:
+            print("Could not parse: {}".format(groups[0]))
+            raise
+        return max(numbers), []
+
+    @staticmethod
+    def min(groups):
+        if len(groups) != 1:
+            raise ValueError("Incorrect regex for min. "
+                             "Did not find 1 group: {}".format(groups))
+        try:
+            entity = json.loads(groups[0])
+            if isinstance(entity, list):
+                numbers = [MathModel.get_number(x) for x in entity]
+            else:
+                print("max can only handle list of entities. Arg: " + str(entity))
+                return "", []
+        except JSONDecodeError:
+            print("Could not parse: {}".format(groups[0]))
+            raise
+        return min(numbers), []
+
+    @staticmethod
+    def count(groups):
+        if len(groups) != 1:
+            raise ValueError("Incorrect regex for max. "
+                             "Did not find 1 group: {}".format(groups))
+        try:
+            entity = json.loads(groups[0])
+            if isinstance(entity, list):
+                return len(entity), []
+            else:
+                print("max can only handle list of entities. Arg: " + str(entity))
+                return "", []
+        except JSONDecodeError:
+            print("Could not parse: {}".format(groups[0]))
+            raise
+
+    @staticmethod
+    def belongs_to(groups):
+        if len(groups) != 2:
+            raise ValueError("Incorrect regex for belongs_to. "
+                             "Did not find 2 groups: {}".format(groups))
+        try:
+            entity = json.loads(groups[0])
+            if isinstance(entity, list):
+                if len(entity) > 1:
+                    print(
+                        "belongs_to can only handle single entity as 1st arg. Args:" + str(groups))
+                    return "", []
+                else:
+                    entity = entity[0]
+        except JSONDecodeError:
+            entity = groups[0]
+        try:
+            ent_list = json.loads(groups[1])
+        except JSONDecodeError:
+            print("Could not JSON parse: " + groups[1])
+            raise
+
+        if not isinstance(ent_list, list):
+            print("belongs_to can only handle lists as 2nd arg. Args:" + str(groups))
+            return "", []
+        if entity in ent_list:
+            return "yes", []
+        else:
+            return "no", []
+
+    @staticmethod
+    def diff(groups):
+        if len(groups) != 2:
+            raise ValueError("Incorrect regex for diff. "
+                             "Did not find 2 groups: {}".format(groups))
+        num1 = MathModel.get_number(groups[0])
+        num2 = MathModel.get_number(groups[1])
+        if num2 > num1:
+            return round(num2 - num1, 3), []
+        else:
+            return round(num1 - num2, 3), []
+
+    @staticmethod
+    def greater_than(groups):
+        if len(groups) != 2:
+            raise ValueError("Incorrect regex for greater_than. "
+                             "Did not find 2 groups: {}".format(groups))
+        num1 = MathModel.get_number(groups[0])
+        num2 = MathModel.get_number(groups[1])
+        if num1 > num2:
+            return "yes", []
+        else:
+            return "no", []
+
+    @staticmethod
+    def smaller_than(groups):
+        if len(groups) != 2:
+            raise ValueError("Incorrect regex for smaller_tha. "
+                             "Did not find 2 groups: {}".format(groups))
+        num1 = MathModel.get_number(groups[0])
+        num2 = MathModel.get_number(groups[1])
+        if num1 < num2:
+            return "yes", []
+        else:
+            return "no", []
+
+    def ask_question(self, question):
+        return self.ask_question_predicate(question)
+
+    def ask_question_predicate(self, question_predicate):
+        for regex, func in self.func_regex.items():
+            m = re.match(regex, question_predicate)
+            if m:
+                return func(m.groups())
+        raise ValueError("Could not parse: {}".format(question_predicate))
 
 
 class StepConfig:

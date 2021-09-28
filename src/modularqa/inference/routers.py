@@ -1,8 +1,7 @@
 import json
 import re
 
-from modularqa.inference.executer import OperationExecuter
-from modularqa.inference.executer_utils import build_models
+from modularqa.inference.executer import OperationExecuter, build_models
 from modularqa.inference.model_search import ParticipantModel
 
 

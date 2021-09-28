@@ -2,128 +2,8 @@ import json
 import re
 from json import JSONDecodeError
 
-from modularqa.inference.model_search import ParticipantModel
-
-pred_match = re.compile("(.*)\((.*)\)")
-
-
-def get_indices(question_str):
-    return [int(m.group(1)) for m in re.finditer("#(\d)", question_str)]
-
-
-def get_predicate_args(predicate_str):
-    mat = pred_match.match(predicate_str)
-    if mat is None:
-        return None, None
-    predicate = mat.group(1)
-    pred_args = mat.group(2).split(", ")
-    return predicate, pred_args
-
-
-def flatten_list(input_list):
-    output_list = []
-    for item in input_list:
-        if isinstance(item, list):
-            output_list.extend(flatten_list(item))
-        else:
-            output_list.append(item)
-    return output_list
-
-
-def align_assignments(target_predicate, source_predicate, source_assignments):
-    target_pred, target_args = get_predicate_args(target_predicate)
-    source_pred, source_args = get_predicate_args(source_predicate)
-    assert target_pred == source_pred, "Predicates should match for alignment"
-    assert len(target_args) == len(source_args), "Number of arguments should match for alignment"
-    target_assignment = {}
-    target_assignment_map = {}
-    for target_arg, source_arg in zip(target_args, source_args):
-        if source_arg == "?":
-            assert target_arg == "?"
-            continue
-        if source_arg not in source_assignments:
-            raise ValueError("No assignment for {} in input assignments: {}".format(
-                source_arg, source_assignments
-            ))
-        target_assignment[target_arg] = source_assignments[source_arg]
-        target_assignment_map[target_arg] = source_arg
-    return target_assignment, target_assignment_map
-
-
-class OperationExecuterParticipant(ParticipantModel):
-    def __init__(self, remodel_file):
-        if remodel_file:
-            with open(remodel_file, "r") as input_fp:
-                input_json = json.load(input_fp)
-            self.kb_lang_groups = []
-            self.qid_to_kb_lang_idx = {}
-            for input_item in input_json:
-                kb = input_item["kb"]
-                pred_lang = input_item["pred_lang_config"]
-                idx = len(self.kb_lang_groups)
-                self.kb_lang_groups.append((kb, pred_lang))
-                for qa_pair in input_item["qa_pairs"]:
-                    qid = qa_pair["id"]
-                    self.qid_to_kb_lang_idx[qid] = idx
-            self.operation_regex = re.compile("\[(.*)\] <(.*)> (.*)")
-
-    def query(self, state, debug=False):
-        """The main function that interfaces with the overall search and
-        model controller, and manipulates the incoming data.
-
-        :param state: the state of controller and model flow.
-        :type state: launchpadqa.question_search.model_search.SearchState
-        :rtype: list
-        """
-        ## the data
-        data = state._data
-        question = data["question_seq"][-1]
-        qid = data["qid"]
-        (kb, pred_lang) = self.kb_lang_groups[self.qid_to_kb_lang_idx[qid]]
-        model_lib = self.build_models(pred_lang, kb)
-        ### run the model (as before)
-        if debug: print("<OPERATION>: %s, qid=%s" % (question, qid))
-        m = self.operation_regex.match(question)
-        assignment = {}
-        for ans_idx, ans in enumerate(data["answer_seq"]):
-            assignment["#" + str(ans_idx + 1)] = json.loads(ans)
-        executer = OperationExecuter(model_library=model_lib)
-        answers, facts_used = executer.execute_operation(operation=m.group(1),
-                                                         model=m.group(2),
-                                                         question=m.group(3),
-                                                         assignments=assignment)
-        if isinstance(answers, list) and len(answers) == 0:
-            return []
-        # copy state
-        new_state = state.copy()
-
-        ## TODO update score?
-
-        ## add answer
-        new_state._data["answer_seq"].append(json.dumps(answers))
-        new_state._data["para_seq"].append("")
-        new_state._data["command_seq"].append("qa")
-
-        ## change output
-        new_state.last_output = answers
-        new_state._next = "gen"
-
-        return [new_state]
-
-    def build_models(self, pred_lang_config, complete_kb):
-        model_library = {}
-        kblookup = KBLookup(kb=complete_kb)
-        for model_name, configs in pred_lang_config.items():
-            if model_name == "math_special":
-                model = MathModel(predicate_language=configs,
-                                  model_name=model_name,
-                                  kblookup=kblookup)
-            else:
-                model = ModelExecutor(predicate_language=configs,
-                                      model_name=model_name,
-                                      kblookup=kblookup)
-            model_library[model_name] = model
-        return model_library
+from modularqa.inference.executer_utils import get_indices, get_predicate_args, flatten_list, \
+    align_assignments, StepConfig, valid_answer
 
 
 class OperationExecuter:
@@ -282,6 +162,7 @@ class ModelExecutor:
         if qpred is not None:
             return self.ask_question_predicate(question_predicate=input_question)
         else:
+            answers, facts_used = None, None
             for pred_lang in self.predicate_language:
                 for question in pred_lang["questions"]:
                     question_re = re.escape(question)
@@ -298,20 +179,29 @@ class ModelExecutor:
                         new_pred = pred_lang["predicate"]
                         for varid, groupid in varid_groupid.items():
                             new_pred = new_pred.replace(varid, qmatch.group(groupid))
-                        return self.ask_question_predicate(new_pred)
+                        answers, facts_used = self.ask_question_predicate(new_pred)
+                        if valid_answer(answers):
+                            # if this is valid answer, return it
+                            return answers, facts_used
 
-            print("No match question found for {} "
-                  "in pred_lang:\n{}".format(input_question, self.predicate_language))
-            return []
+            if answers is not None:
+                # some match found for the question but no valid answer.
+                # Return the last matching answer.
+                return answers, facts_used
+            else:
+                raise ValueError("No match question found for {} "
+                                 "in pred_lang:\n{}".format(input_question,
+                                                            self.predicate_language))
 
     def ask_question_predicate(self, question_predicate):
         qpred, qargs = get_predicate_args(question_predicate)
+        facts_used = []
         for pred_lang in self.predicate_language:
             mpred, margs = get_predicate_args(pred_lang["predicate"])
             if mpred == qpred:
                 if "steps" in pred_lang:
                     model_library = {"kblookup": self.kblookup}
-                    kb_executer = OperationExecuter(model_library=model_library)
+                    kb_executor = OperationExecuter(model_library)
                     source_assignments = {x: x for x in qargs}
                     curr_assignment, assignment_map = align_assignments(
                         target_predicate=pred_lang["predicate"],
@@ -327,59 +217,22 @@ class ModelExecutor:
                         for k, v in curr_assignment.items():
                             if k.startswith("$"):
                                 new_question = new_question.replace(k, v)
-                        answers = kb_executer.execute_operation(operation=step.operation,
-                                                                model=model,
-                                                                question=new_question,
-                                                                assignments=curr_assignment)
-                        if answers:
+                        answers, facts = kb_executor.execute_operation(operation=step.operation,
+                                                                       model=model,
+                                                                       question=new_question,
+                                                                       assignments=curr_assignment)
+                        if valid_answer(answers):
                             curr_assignment[step.answer] = answers
+                            facts_used.extend(facts)
                         else:
-                            print(self.kblookup.kb)
-                            raise ValueError("No answer found for o:{} m:{} q:{}".format(
-                                step.operation, model, new_question
-                            ))
+                            return [], []
+                            # print(self.kblookup.kb)
+                            # raise ValueError("No answer found for o:{} m:{} q:{}".format(
+                            #     step.operation, model, new_question))
                         last_answer = step.answer
-                    return curr_assignment[last_answer]
+                    return curr_assignment[last_answer], facts_used
                 else:
                     return self.kblookup.ask_question_predicate(question_predicate)
-
-
-class KBLookup:
-    def __init__(self, kb):
-        self.kb = kb
-
-    def ask_question(self, question_predicate):
-        return self.ask_question_predicate(question_predicate)
-
-    def ask_question_predicate(self, question_predicate):
-        predicate, pred_args = get_predicate_args(question_predicate)
-        answers = []
-        # print("asking " + question_predicate)
-        for fact in self.kb[predicate]:
-            fact_pred, fact_args = get_predicate_args(fact)
-            if len(pred_args) != len(fact_args):
-                raise ValueError(
-                    "Mismatch in specification args {} and fact args {}".format(
-                        pred_args, fact_args
-                    ))
-            mismatch = False
-            answer = ""
-            # print(pred_args, fact_args)
-            for p, f in zip(pred_args, fact_args):
-                if p != "?" and p != f:
-                    mismatch = True
-                elif p == "?":
-                    answer = f
-            if not mismatch:
-                answers.append(answer)
-            # print(mismatch, answer, answers)
-        if "?" not in pred_args:
-            if len(answers) == 0:
-                return "no"
-            else:
-                return "yes"
-        else:
-            return answers
 
 
 class MathModel(ModelExecutor):
@@ -541,16 +394,43 @@ class MathModel(ModelExecutor):
         raise ValueError("Could not parse: {}".format(question_predicate))
 
 
-class StepConfig:
-    def __init__(self, step_json):
-        self.operation = step_json["operation"]
-        self.question = step_json["question"]
-        self.answer = step_json["answer"]
+class KBLookup:
+    def __init__(self, kb):
+        self.kb = kb
 
-    def to_json(self):
-        return self.__dict__
+    def ask_question(self, question_predicate):
+        return self.ask_question_predicate(question_predicate)
 
-    def answer_question(self, assignment):
-        new_question = self.question
-        for k, v in assignment:
-            new_question = new_question.replace(k, v)
+    def ask_question_predicate(self, question_predicate):
+        predicate, pred_args = get_predicate_args(question_predicate)
+        answers = []
+        facts_used = []
+        # print("asking " + question_predicate)
+        for fact in self.kb[predicate]:
+            fact_pred, fact_args = get_predicate_args(fact)
+            if len(pred_args) != len(fact_args):
+                raise ValueError(
+                    "Mismatch in specification args {} and fact args {}".format(
+                        pred_args, fact_args
+                    ))
+            mismatch = False
+            answer = ""
+            # print(pred_args, fact_args)
+            for p, f in zip(pred_args, fact_args):
+                if p != "?" and p != f and p != "_":
+                    mismatch = True
+                elif p == "?":
+                    answer = f
+            if not mismatch:
+                answers.append(answer)
+                facts_used.append(fact)
+            # print(mismatch, answer, answers)
+        if "?" not in pred_args:
+            if len(answers) == 0:
+                return "no", facts_used
+            else:
+                return "yes", facts_used
+        else:
+            return answers, facts_used
+
+

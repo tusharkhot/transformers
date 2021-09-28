@@ -1,9 +1,9 @@
 from typing import Dict
 
 from modularqa.inference.dataset_readers import HotpotQAReader, DatasetReader, DropReader
-from modularqa.inference.executer import OperationExecuterParticipant
 from modularqa.inference.participant_qa import LMQAParticipant, MathQAParticipant, \
-    ModelRouter, BoolQAParticipant, DecompRCQA, QAEnsemble
+    BoolQAParticipant, DecompRCQA, QAEnsemble
+from modularqa.inference.routers import ModelRouter, ExecutionRouter
 from modularqa.inference.participant_qgen import LMGenParticipant, DecompRCGenParticipant, \
     BreakLMGenParticipant
 from modularqa.inference.quality_checkers import QualityCheckerExample, ChainOverlapScorer, \
@@ -24,7 +24,7 @@ MODEL_NAME_CLASS = {
     "mathqa": MathQAParticipant,
     "boolqa": BoolQAParticipant,
     "model_router": ModelRouter,
-    "operation_executer": OperationExecuterParticipant
+    "operation_executer": ExecutionRouter
 }
 
 READER_NAME_CLASS: Dict[str, DatasetReader] = {

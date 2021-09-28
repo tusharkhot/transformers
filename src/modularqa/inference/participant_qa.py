@@ -9,44 +9,6 @@ from modularqa.utils.math_qa import MathQA
 from modularqa.utils.qa import LMQuestionAnswerer, BoolQuestionAnswerer, QAAnswer
 
 
-class ModelRouter(ParticipantModel):
-
-    def __init__(self, question_pattern=None):
-        if question_pattern:
-            self.question_pattern = re.compile(question_pattern)
-        else:
-            self.question_pattern = re.compile("^\(([^\)]+)\)(.*)$")
-
-    def query(self, state, debug=False):
-        data = state._data
-        question = data["question_seq"][-1]
-        qid = data["qid"]
-        new_state = state.copy()
-        if question == "[EOQ]":
-            new_state._next = "EOQ"
-            return [new_state]
-        m = self.question_pattern.match(question)
-        if m:
-            send_to = m.group(1)
-            new_q = m.group(2).strip()
-            if debug: print("<ROUTE>: %s, qid=%s, route=%s" % (new_q, qid, send_to))
-
-            new_state._data["model_seq"].append(send_to)
-            new_state._data["question_seq"][-1] = new_q
-            new_state._data["command_seq"].append("route")
-            new_state._next = send_to
-        else:
-            print("Question didn't match format!: {}".format(question))
-            # new_state = state.copy()
-            # new_state._score = float('inf')
-            # new_state._data["model_seq"].append("N/A")
-            # new_state._data["answer_seq"].append("N/A")
-            # new_state._data["command_seq"].append("route")
-            return []
-
-        return [new_state]
-
-
 class LMQAParticipant(LMQuestionAnswerer, ParticipantModel):
     """A slightly modified BERT QA model that has a new method, called `query`,
     which will be used directly by the controller (in place of `answer_question_only`.

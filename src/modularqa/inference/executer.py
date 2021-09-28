@@ -6,6 +6,22 @@ from modularqa.inference.executer_utils import get_indices, get_predicate_args, 
     align_assignments, StepConfig, valid_answer
 
 
+
+def build_models(pred_lang_config, complete_kb):
+    model_library = {}
+    kblookup = KBLookup(kb=complete_kb)
+    for model_name, configs in pred_lang_config.items():
+        if model_name == "math_special":
+            model = MathModel(predicate_language=configs,
+                              model_name=model_name,
+                              kblookup=kblookup)
+        else:
+            model = ModelExecutor(predicate_language=configs,
+                                  model_name=model_name,
+                                  kblookup=kblookup)
+        model_library[model_name] = model
+    return model_library
+
 class OperationExecuter:
 
     def __init__(self, model_library):

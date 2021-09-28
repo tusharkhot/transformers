@@ -1,7 +1,5 @@
 import re
 
-from modularqa.inference.executer import KBLookup, MathModel, ModelExecutor
-
 
 def get_indices(question_str):
     return [int(m.group(1)) for m in re.finditer("#(\d)", question_str)]
@@ -72,19 +70,3 @@ def valid_answer(answer):
     if isinstance(answer, float) and answer == 0.0:
         return False
     return True
-
-
-def build_models(pred_lang_config, complete_kb):
-    model_library = {}
-    kblookup = KBLookup(kb=complete_kb)
-    for model_name, configs in pred_lang_config.items():
-        if model_name == "math_special":
-            model = MathModel(predicate_language=configs,
-                              model_name=model_name,
-                              kblookup=kblookup)
-        else:
-            model = ModelExecutor(predicate_language=configs,
-                                  model_name=model_name,
-                                  kblookup=kblookup)
-        model_library[model_name] = model
-    return model_library

@@ -50,8 +50,7 @@ def align_assignments(target_predicate, source_predicate, source_assignments):
     return target_assignment, target_assignment_map
 
 
-
-class OperationExecuter(ParticipantModel):
+class OperationExecuterParticipant(ParticipantModel):
     def __init__(self, remodel_file):
         if remodel_file:
             with open(remodel_file, "r") as input_fp:
@@ -67,7 +66,6 @@ class OperationExecuter(ParticipantModel):
                     qid = qa_pair["id"]
                     self.qid_to_kb_lang_idx[qid] = idx
             self.operation_regex = re.compile("\[(.*)\] <(.*)> (.*)")
-
 
     def query(self, state, debug=False):
         """The main function that interfaces with the overall search and
@@ -88,12 +86,12 @@ class OperationExecuter(ParticipantModel):
         m = self.operation_regex.match(question)
         assignment = {}
         for ans_idx, ans in enumerate(data["answer_seq"]):
-            assignment["#" + str(ans_idx+1)] = json.loads(ans)
-        answers, facts_used = self.execute_operation(model_library=model_lib,
-                                                     operation=m.group(1),
-                                                     model=m.group(2),
-                                                     question=m.group(3),
-                                                     assignments=assignment)
+            assignment["#" + str(ans_idx + 1)] = json.loads(ans)
+        executer = OperationExecuter(model_library=model_lib)
+        answers, facts_used = executer.execute_operation(operation=m.group(1),
+                                                         model=m.group(2),
+                                                         question=m.group(3),
+                                                         assignments=assignment)
         if isinstance(answers, list) and len(answers) == 0:
             return []
         # copy state
@@ -126,6 +124,12 @@ class OperationExecuter(ParticipantModel):
                                       kblookup=kblookup)
             model_library[model_name] = model
         return model_library
+
+
+class OperationExecuter:
+
+    def __init__(self, model_library):
+        self.model_library = model_library
 
     def execute_select(self, operation, model, question, assignments):
         assert model in self.model_library, "Model: {} not found in model library!".format(
@@ -267,7 +271,6 @@ class OperationExecuter(ParticipantModel):
             return [], []
 
 
-
 class ModelExecutor:
     def __init__(self, predicate_language, model_name, kblookup):
         self.predicate_language = predicate_language
@@ -298,7 +301,7 @@ class ModelExecutor:
                         return self.ask_question_predicate(new_pred)
 
             print("No match question found for {} "
-                             "in pred_lang:\n{}".format(input_question, self.predicate_language))
+                  "in pred_lang:\n{}".format(input_question, self.predicate_language))
             return []
 
     def ask_question_predicate(self, question_predicate):
@@ -307,8 +310,8 @@ class ModelExecutor:
             mpred, margs = get_predicate_args(pred_lang["predicate"])
             if mpred == qpred:
                 if "steps" in pred_lang:
-                    kb_executer = OperationExecuter(None)
                     model_library = {"kblookup": self.kblookup}
+                    kb_executer = OperationExecuter(model_library=model_library)
                     source_assignments = {x: x for x in qargs}
                     curr_assignment, assignment_map = align_assignments(
                         target_predicate=pred_lang["predicate"],
@@ -324,11 +327,10 @@ class ModelExecutor:
                         for k, v in curr_assignment.items():
                             if k.startswith("$"):
                                 new_question = new_question.replace(k, v)
-                        answers = kb_executer.execute_operation(model_library=model_library,
-                                                         operation=step.operation,
-                                                         model=model,
-                                                         question=new_question,
-                                                         assignments=curr_assignment)
+                        answers = kb_executer.execute_operation(operation=step.operation,
+                                                                model=model,
+                                                                question=new_question,
+                                                                assignments=curr_assignment)
                         if answers:
                             curr_assignment[step.answer] = answers
                         else:

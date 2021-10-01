@@ -38,8 +38,9 @@ class OperationExecuter:
         for index in indices:
             idx_str = "#" + str(index)
             if idx_str not in assignments:
-                raise ValueError("Can not perform project operation with input arg: {}"
-                                 " No assignments yet!".format(idx_str))
+                print("Can not perform project operation with input arg: {}"
+                        " No assignments yet!".format(idx_str))
+                return [], []
             question = question.replace(idx_str, json.dumps(assignments[idx_str]))
         answers, facts_used = self.model_library[model].ask_question(question)
         if operation == "select_flat":
@@ -287,7 +288,8 @@ class MathModel(ModelExecutor):
             return None
         if isinstance(item, list):
             if (len(item)) != 1:
-                raise ValueError("List of values instead of single number in {}".format(num))
+                print("List of values instead of single number in {}".format(num))
+                return None
             item = item[0]
         try:
             return float(item)

@@ -14,13 +14,17 @@ def build_models(pred_lang_config, complete_kb):
         if model_name == "math_special":
             model = MathModel(predicate_language=configs,
                               model_name=model_name,
-                              kblookup=kblookup)
+                              kblookup=kblookup,
+                              ignore_input_mismatch=True)
         else:
             model = ModelExecutor(predicate_language=configs,
                                   model_name=model_name,
-                                  kblookup=kblookup)
+                                  kblookup=kblookup,
+                                  ignore_input_mismatch=True)
         model_library[model_name] = model
     return model_library
+
+
 
 class OperationExecuter:
 
@@ -168,10 +172,11 @@ class OperationExecuter:
 
 
 class ModelExecutor:
-    def __init__(self, predicate_language, model_name, kblookup):
+    def __init__(self, predicate_language, model_name, kblookup, ignore_input_mismatch=False):
         self.predicate_language = predicate_language
         self.model_name = model_name
         self.kblookup = kblookup
+        self.ignore_input_mismatch = ignore_input_mismatch
 
     def ask_question(self, input_question):
         qpred, qargs = get_predicate_args(input_question)
@@ -204,10 +209,14 @@ class ModelExecutor:
                 # some match found for the question but no valid answer.
                 # Return the last matching answer.
                 return answers, facts_used
-            else:
+            elif not self.ignore_input_mismatch:
                 raise ValueError("No match question found for {} "
                                  "in pred_lang:\n{}".format(input_question,
                                                             self.predicate_language))
+            else:
+                # no matching question. return empty
+                return [], []
+
 
     def ask_question_predicate(self, question_predicate):
         qpred, qargs = get_predicate_args(question_predicate)
@@ -255,24 +264,27 @@ class MathModel(ModelExecutor):
 
     def __init__(self, **kwargs):
         self.func_regex = {
-            "is_greater\((.+) \| (.+)\)": MathModel.greater_than,
-            "is_smaller\((.+) \| (.+)\)": MathModel.smaller_than,
-            "diff\((.+) \| (.+)\)": MathModel.diff,
-            "belongs_to\((.+) \| (.+)\)": MathModel.belongs_to,
-            "max\((.+)\)": MathModel.max,
-            "min\((.+)\)": MathModel.min,
-            "count\((.+)\)": MathModel.count
+            "is_greater\((.+) \| (.+)\)": self.greater_than,
+            "is_smaller\((.+) \| (.+)\)": self.smaller_than,
+            "diff\((.+) \| (.+)\)": self.diff,
+            "belongs_to\((.+) \| (.+)\)": self.belongs_to,
+            "max\((.+)\)": self.max,
+            "min\((.+)\)": self.min,
+            "count\((.+)\)": self.count
 
         }
         super(MathModel, self).__init__(**kwargs)
 
     @staticmethod
     def get_number(num):
+        # can only extract numbers from strings
+        if not isinstance(num, str):
+            return None
         try:
             item = json.loads(num)
         except JSONDecodeError:
             print("Could not JSON parse: " + num)
-            raise
+            return None
         if isinstance(item, list):
             if (len(item)) != 1:
                 raise ValueError("List of values instead of single number in {}".format(num))
@@ -281,17 +293,26 @@ class MathModel(ModelExecutor):
             return float(item)
         except ValueError:
             print("Could not parse float from: " + item)
-            raise
+            return None
 
-    @staticmethod
-    def max(groups):
+    def max(self, groups):
         if len(groups) != 1:
             raise ValueError("Incorrect regex for max. "
                              "Did not find 1 group: {}".format(groups))
         try:
             entity = json.loads(groups[0])
+
             if isinstance(entity, list):
-                numbers = [MathModel.get_number(x) for x in entity]
+                numbers = []
+                for x in entity:
+                    num = MathModel.get_number(x)
+                    if num is None:
+                        if self.ignore_input_mismatch:
+                            print("Cannot parse as number: {}".format(x))
+                            return "", []
+                        else:
+                            raise ValueError("Cannot parse as number: {} in {}".format(x, entity))
+                    numbers.append(num)
             else:
                 print("max can only handle list of entities. Arg: " + str(entity))
                 return "", []
@@ -300,25 +321,35 @@ class MathModel(ModelExecutor):
             raise
         return max(numbers), []
 
-    @staticmethod
-    def min(groups):
+    def min(self, groups):
         if len(groups) != 1:
             raise ValueError("Incorrect regex for min. "
                              "Did not find 1 group: {}".format(groups))
         try:
             entity = json.loads(groups[0])
             if isinstance(entity, list):
-                numbers = [MathModel.get_number(x) for x in entity]
+                numbers = []
+                for x in entity:
+                    num = MathModel.get_number(x)
+                    if num is None:
+                        if self.ignore_input_mismatch:
+                            print("Cannot parse as number: {}".format(x))
+                            return "", []
+                        else:
+                            raise ValueError("Cannot parse as number: {} in {}".format(x, entity))
+                    numbers.append(num)
             else:
-                print("max can only handle list of entities. Arg: " + str(entity))
+                print("min can only handle list of entities. Arg: " + str(entity))
                 return "", []
         except JSONDecodeError:
             print("Could not parse: {}".format(groups[0]))
-            raise
+            if self.ignore_input_mismatch:
+                return "", []
+            else:
+                raise
         return min(numbers), []
 
-    @staticmethod
-    def count(groups):
+    def count(self, groups):
         if len(groups) != 1:
             raise ValueError("Incorrect regex for max. "
                              "Did not find 1 group: {}".format(groups))
@@ -327,14 +358,16 @@ class MathModel(ModelExecutor):
             if isinstance(entity, list):
                 return len(entity), []
             else:
-                print("max can only handle list of entities. Arg: " + str(entity))
+                print("count can only handle list of entities. Arg: " + str(entity))
                 return "", []
         except JSONDecodeError:
             print("Could not parse: {}".format(groups[0]))
-            raise
+            if self.ignore_input_mismatch:
+                return "", []
+            else:
+                raise
 
-    @staticmethod
-    def belongs_to(groups):
+    def belongs_to(self, groups):
         if len(groups) != 2:
             raise ValueError("Incorrect regex for belongs_to. "
                              "Did not find 2 groups: {}".format(groups))
@@ -363,37 +396,52 @@ class MathModel(ModelExecutor):
         else:
             return "no", []
 
-    @staticmethod
-    def diff(groups):
+    def diff(self, groups):
         if len(groups) != 2:
             raise ValueError("Incorrect regex for diff. "
                              "Did not find 2 groups: {}".format(groups))
         num1 = MathModel.get_number(groups[0])
         num2 = MathModel.get_number(groups[1])
+        if num1 is None or num2 is None:
+            if self.ignore_input_mismatch:
+                # can not compare with Nones
+                return "", []
+            else:
+                raise ValueError("Cannot answer diff with {}".format(groups))
         if num2 > num1:
             return round(num2 - num1, 3), []
         else:
             return round(num1 - num2, 3), []
 
-    @staticmethod
-    def greater_than(groups):
+    def greater_than(self, groups):
         if len(groups) != 2:
             raise ValueError("Incorrect regex for greater_than. "
                              "Did not find 2 groups: {}".format(groups))
         num1 = MathModel.get_number(groups[0])
         num2 = MathModel.get_number(groups[1])
+        if num1 is None or num2 is None:
+            if self.ignore_input_mismatch:
+                # can not compare with Nones
+                return "", []
+            else:
+                raise ValueError("Cannot answer gt with {}".format(groups))
         if num1 > num2:
             return "yes", []
         else:
             return "no", []
 
-    @staticmethod
-    def smaller_than(groups):
+    def smaller_than(self, groups):
         if len(groups) != 2:
-            raise ValueError("Incorrect regex for smaller_tha. "
+            raise ValueError("Incorrect regex for smaller_than. "
                              "Did not find 2 groups: {}".format(groups))
         num1 = MathModel.get_number(groups[0])
         num2 = MathModel.get_number(groups[1])
+        if num1 is None or num2 is None:
+            if self.ignore_input_mismatch:
+                # can not compare with Nones
+                return "", []
+            else:
+                raise ValueError("Cannot answer lt with {}".format(groups))
         if num1 < num2:
             return "yes", []
         else:
@@ -448,5 +496,3 @@ class KBLookup:
                 return "yes", facts_used
         else:
             return answers, facts_used
-
-

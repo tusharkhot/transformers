@@ -39,10 +39,13 @@ class QualityCheckerExample(ParticipantModel):
 
 class ChainOverlapScorer(ParticipantModel):
 
-    def __init__(self, dump_chains=None, repeat_ok=False, dump_partial=False, **kwargs):
+    def __init__(self, dump_chains=None, repeat_ok=False, dump_partial=False,
+                 match_answers=True, max_depth=100, **kwargs):
         self.dump_chains = dump_chains
         self.repeat_ok = repeat_ok
         self.dump_partial = dump_partial
+        self.match_answers = match_answers
+        self.max_depth = max_depth
         super(ChainOverlapScorer, self).__init__(**kwargs)
 
     def query(self, state, debug=False):
@@ -59,6 +62,10 @@ class ChainOverlapScorer(ParticipantModel):
         if debug:
             print("<QUALITYCHECK>: Qs: {} As: {} Q: {}".format(
                 ", ".join(qchain), ", ".join(achain), origq))
+        if len(achain) > self.max_depth:
+            if debug:
+                print("Hit max chain limit!")
+                return  []
         if qchain[-1] == "[EOQ]":
             new_qchain = deepcopy(qchain)
             new_qchain.pop(-1)
@@ -75,7 +82,7 @@ class ChainOverlapScorer(ParticipantModel):
                         ans = achain[-1]
                     chains_fp.write(data["qid"] + "\t" + sequence + "\t" + ans + "\t" +
                                     "$$".join(data.get("para_seq")) + "\n")
-            if unmatched_answers > 0:
+            if unmatched_answers > 0 and self.match_answers:
                 if debug:
                     print("Unmatched answers! Rejecting!"
                           "Qs: {} As: {} Q: {}".format(", ".join(qchain), ", ".join(achain), origq))
